@@ -1,0 +1,730 @@
+import { useState } from "react";
+import { Card, CardContent } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "./ui/table";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "./ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "./ui/select";
+import {
+  Users, Plus, Upload, Download, Search, MoreHorizontal, Phone, MapPin,
+  FileUp, Eye, Pencil, Trash2, ListChecks, Ban, CheckCircle2, UserX,
+} from "lucide-react";
+import { clients as initialClients, clientListMembers as initialMembership } from "./mock-data";
+import { toast } from "sonner";
+
+type ClientType = typeof initialClients[0];
+
+const statusStyles: Record<string, string> = {
+  active: "bg-green-100 text-green-700 border-green-200",
+  inactive: "bg-gray-100 text-gray-600 border-gray-200",
+  do_not_call: "bg-red-100 text-red-700 border-red-200",
+};
+
+const clientLists = [
+  { id: "1", name: "Islamabad Investors" },
+  { id: "2", name: "DHA Lahore Leads" },
+  { id: "3", name: "Karachi High Net Worth" },
+  { id: "4", name: "Rawalpindi End Users" },
+  { id: "5", name: "Overseas Pakistanis" },
+  { id: "6", name: "Bahria Town Interested" },
+];
+
+export function ClientsPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [clientsList, setClientsList] = useState(initialClients);
+  const [membership, setMembership] = useState(initialMembership);
+  const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
+
+  // Add client form state
+  const [newClient, setNewClient] = useState({
+    name: "", phone: "", location: "", tags: "", status: "active", source: "Manual", notes: "",
+  });
+
+  // Edit client form state
+  const [editClient, setEditClient] = useState({
+    name: "", phone: "", location: "", tags: "", status: "active", source: "Manual",
+  });
+
+  const filtered = clientsList.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.phone.includes(searchQuery);
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.phone) {
+      toast.error("Name and Phone are required");
+      return;
+    }
+    const client = {
+      id: String(Date.now()),
+      name: newClient.name,
+      phone: newClient.phone,
+      location: newClient.location || "N/A",
+      tags: newClient.tags ? newClient.tags.split(",").map((t) => t.trim()) : [],
+      status: newClient.status as "active" | "inactive" | "do_not_call",
+      source: newClient.source,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    setClientsList((prev) => [client, ...prev]);
+    setNewClient({ name: "", phone: "", location: "", tags: "", status: "active", source: "Manual", notes: "" });
+    setAddOpen(false);
+    toast.success(`Client "${client.name}" added successfully`);
+  };
+
+  const handleEditClient = () => {
+    if (!selectedClient || !editClient.name || !editClient.phone) {
+      toast.error("Name and Phone are required");
+      return;
+    }
+    setClientsList((prev) =>
+      prev.map((c) =>
+        c.id === selectedClient.id
+          ? {
+              ...c,
+              name: editClient.name,
+              phone: editClient.phone,
+              location: editClient.location,
+              tags: editClient.tags ? editClient.tags.split(",").map((t) => t.trim()) : [],
+              status: editClient.status as "active" | "inactive" | "do_not_call",
+              source: editClient.source,
+            }
+          : c
+      )
+    );
+    setEditOpen(false);
+    toast.success(`Client "${editClient.name}" updated`);
+  };
+
+  const openView = (client: ClientType) => {
+    setSelectedClient(client);
+    setViewOpen(true);
+  };
+
+  const openEdit = (client: ClientType) => {
+    setSelectedClient(client);
+    setEditClient({
+      name: client.name,
+      phone: client.phone,
+      location: client.location,
+      tags: client.tags.join(", "),
+      status: client.status,
+      source: client.source,
+    });
+    setEditOpen(true);
+  };
+
+  const handleDelete = (client: ClientType) => {
+    setClientsList((prev) => prev.filter((c) => c.id !== client.id));
+    toast.success(`Client "${client.name}" deleted`);
+  };
+
+  const changeStatus = (client: ClientType, newStatus: string) => {
+    setClientsList((prev) =>
+      prev.map((c) =>
+        c.id === client.id ? { ...c, status: newStatus as any } : c
+      )
+    );
+    toast.success(`${client.name} status changed to ${newStatus.replace("_", " ")}`);
+  };
+
+  const addToList = (client: ClientType, listId: string, listName: string) => {
+    setMembership((prev) => {
+      const current = prev[listId] || [];
+      if (current.includes(client.id)) {
+        toast.info(`${client.name} is already in "${listName}"`);
+        return prev;
+      }
+      toast.success(`${client.name} added to "${listName}"`);
+      return { ...prev, [listId]: [...current, client.id] };
+    });
+  };
+
+  const getClientLists = (clientId: string) => {
+    return clientLists.filter((list) => (membership[list.id] || []).includes(clientId));
+  };
+
+  const handleExport = () => {
+    const headers = ["Name", "Phone", "Location", "Tags", "Status", "Source", "Created At"];
+    const rows = clientsList.map((c) => [
+      c.name, c.phone, c.location, c.tags.join("; "), c.status, c.source, c.createdAt,
+    ]);
+    const csvContent = [headers, ...rows].map((r) => r.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "voiceestate-clients.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${clientsList.length} clients to CSV`);
+  };
+
+  const handleImport = () => {
+    const imported = [
+      { id: String(Date.now()), name: "Imported Client 1", phone: "+92 300 0000001", location: "Islamabad", tags: ["CSV Import"], status: "active" as const, source: "CSV Import", createdAt: new Date().toISOString().split("T")[0] },
+      { id: String(Date.now() + 1), name: "Imported Client 2", phone: "+92 300 0000002", location: "Lahore", tags: ["CSV Import"], status: "active" as const, source: "CSV Import", createdAt: new Date().toISOString().split("T")[0] },
+    ];
+    setClientsList((prev) => [...imported, ...prev]);
+    setImportOpen(false);
+    toast.success(`Successfully imported ${imported.length} clients`);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1>Clients</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Manage your client database and import contacts.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            Import CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="w-4 h-4" />
+            Export
+          </Button>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Client
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="gap-3">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground">Total Clients</p>
+            <p className="text-2xl mt-1">{clientsList.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-3">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground">Active</p>
+            <p className="text-2xl mt-1 text-green-600">
+              {clientsList.filter((c) => c.status === "active").length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="gap-3">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground">Inactive</p>
+            <p className="text-2xl mt-1 text-gray-500">
+              {clientsList.filter((c) => c.status === "inactive").length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="gap-3">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground">Do Not Call</p>
+            <p className="text-2xl mt-1 text-red-500">
+              {clientsList.filter((c) => c.status === "do_not_call").length}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center gap-2 flex-1 border border-border rounded-lg px-3 py-2">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by name or phone..."
+                className="bg-transparent outline-none text-sm w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <select
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-transparent"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="do_not_call">Do Not Call</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="pt-0 px-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Location</TableHead>
+                <TableHead className="hidden lg:table-cell">Tags</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Source</TableHead>
+                <TableHead className="hidden lg:table-cell">Created</TableHead>
+                <TableHead className="w-10"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((client) => (
+                <TableRow key={client.id} className="cursor-pointer">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs text-accent-foreground">
+                        {client.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <span className="text-sm">{client.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Phone className="w-3 h-3" />
+                      {client.phone}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <MapPin className="w-3 h-3" />
+                      {client.location}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex gap-1 flex-wrap">
+                      {client.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={statusStyles[client.status]}>
+                      {client.status.replace("_", " ")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {client.source}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {client.createdAt}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-1 rounded hover:bg-accent">
+                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel className="text-xs">{client.name}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onClick={() => openView(client)}>
+                            <Eye className="w-4 h-4" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEdit(client)}>
+                            <Pencil className="w-4 h-4" />
+                            Edit Client
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+
+                        {/* Add to List submenu */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <ListChecks className="w-4 h-4" />
+                            Add to List
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {clientLists.map((list) => {
+                              const isInList = (membership[list.id] || []).includes(client.id);
+                              return (
+                                <DropdownMenuItem
+                                  key={list.id}
+                                  onClick={() => addToList(client, list.id, list.name)}
+                                  disabled={isInList}
+                                >
+                                  {isInList && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                                  <span className={isInList ? "text-muted-foreground" : ""}>{list.name}</span>
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        {/* Change Status submenu */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Change Status
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuItem
+                              onClick={() => changeStatus(client, "active")}
+                              disabled={client.status === "active"}
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-green-500" />
+                              Active
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => changeStatus(client, "inactive")}
+                              disabled={client.status === "inactive"}
+                            >
+                              <UserX className="w-3 h-3 text-gray-500" />
+                              Inactive
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => changeStatus(client, "do_not_call")}
+                              disabled={client.status === "do_not_call"}
+                            >
+                              <Ban className="w-3 h-3 text-red-500" />
+                              Do Not Call
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => handleDelete(client)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Client
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* View Client Dialog */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Client Details</DialogTitle>
+            <DialogDescription>View full client information and list memberships.</DialogDescription>
+          </DialogHeader>
+          {selectedClient && (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-base text-accent-foreground">
+                  {selectedClient.name.split(" ").map(n => n[0]).join("")}
+                </div>
+                <div>
+                  <p className="text-base">{selectedClient.name}</p>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                    <Phone className="w-3 h-3" />
+                    {selectedClient.phone}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                    <MapPin className="w-3 h-3" />
+                    {selectedClient.location}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={statusStyles[selectedClient.status]}>
+                  {selectedClient.status.replace("_", " ")}
+                </Badge>
+                {selectedClient.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Source</p>
+                  <p className="text-sm mt-0.5">{selectedClient.source}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Created</p>
+                  <p className="text-sm mt-0.5">{selectedClient.createdAt}</p>
+                </div>
+              </div>
+
+              {/* Show which lists this client belongs to */}
+              {(() => {
+                const inLists = getClientLists(selectedClient.id);
+                if (inLists.length === 0) return null;
+                return (
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <ListChecks className="w-3 h-3" />
+                      Member of Lists
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {inLists.map((list) => (
+                        <Badge key={list.id} variant="secondary">{list.name}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setViewOpen(false);
+                if (selectedClient) openEdit(selectedClient);
+              }}
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </Button>
+            <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>Update client information.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input
+                  value={editClient.name}
+                  onChange={(e) => setEditClient({ ...editClient, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number *</Label>
+                <Input
+                  value={editClient.phone}
+                  onChange={(e) => setEditClient({ ...editClient, phone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input
+                  value={editClient.location}
+                  onChange={(e) => setEditClient({ ...editClient, location: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Select value={editClient.source} onValueChange={(v) => setEditClient({ ...editClient, source: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Manual">Manual</SelectItem>
+                    <SelectItem value="CSV Import">CSV Import</SelectItem>
+                    <SelectItem value="Website">Website</SelectItem>
+                    <SelectItem value="Referral">Referral</SelectItem>
+                    <SelectItem value="Social Media">Social Media</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <Input
+                  placeholder="Investor, Premium"
+                  value={editClient.tags}
+                  onChange={(e) => setEditClient({ ...editClient, tags: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editClient.status} onValueChange={(v) => setEditClient({ ...editClient, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="do_not_call">Do Not Call</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditClient}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Client Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+            <DialogDescription>
+              Enter client details to add them to your database.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input
+                  placeholder="e.g., Ahmed Khan"
+                  value={newClient.name}
+                  onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number *</Label>
+                <Input
+                  placeholder="+92 3XX XXXXXXX"
+                  value={newClient.phone}
+                  onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input
+                  placeholder="e.g., Islamabad"
+                  value={newClient.location}
+                  onChange={(e) => setNewClient({ ...newClient, location: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Select value={newClient.source} onValueChange={(v) => setNewClient({ ...newClient, source: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Manual">Manual</SelectItem>
+                    <SelectItem value="CSV Import">CSV Import</SelectItem>
+                    <SelectItem value="Website">Website</SelectItem>
+                    <SelectItem value="Referral">Referral</SelectItem>
+                    <SelectItem value="Social Media">Social Media</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <Input
+                  placeholder="Investor, Premium (comma separated)"
+                  value={newClient.tags}
+                  onChange={(e) => setNewClient({ ...newClient, tags: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={newClient.status} onValueChange={(v) => setNewClient({ ...newClient, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="do_not_call">Do Not Call</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Any additional notes about the client..."
+                value={newClient.notes}
+                onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddClient}>
+              <Plus className="w-4 h-4" />
+              Add Client
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import CSV Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Clients from CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file with columns: Name, Phone, Location, Tags, Status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+              <FileUp className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                Drag & drop your CSV file here, or click to browse
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Supports .csv files up to 10MB
+              </p>
+              <Button variant="outline" size="sm" className="mt-4">
+                Browse Files
+              </Button>
+            </div>
+            <div className="bg-accent/50 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">
+                <strong>Required columns:</strong> Name, Phone<br />
+                <strong>Optional columns:</strong> Location, Tags, Status, Source
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+            <Button onClick={handleImport}>
+              <Upload className="w-4 h-4" />
+              Import (Demo)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

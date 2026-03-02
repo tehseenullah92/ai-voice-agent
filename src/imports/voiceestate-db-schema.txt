@@ -1,0 +1,307 @@
+You are an expert full-stack developer. Help me build a multi-tenant SaaS platform called "VoiceEstate" — an AI-powered outbound voice calling platform for real estate businesses in Pakistan. The AI agent calls clients on behalf of real estate companies to pitch projects, capture interest, and book site visits. The voice agent is powered by VAPI.ai.
+
+---
+
+## TECH STACK
+
+Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+Backend: Node.js with Express (TypeScript)
+Database: PostgreSQL with Prisma ORM
+Cache: Redis (via Upstash)
+File Storage: AWS S3 (CSV imports, recordings)
+Voice Agent: VAPI.ai (outbound calls)
+Auth: NextAuth.js with JWT
+Payments: Not in scope yet
+Deployment: Docker ready
+
+---
+
+## DATABASE SCHEMA
+
+Create a full Prisma schema with the following models:
+
+- SuperAdmin (platform owner)
+- Company (real estate business - tenant)
+- User (belongs to a company, roles: admin, agent)
+- ClientList (named group of clients per company)
+- Client (name, phone, alternate_phone, location, tags, status, source, notes, company_id, list_id)
+- Campaign (name, description, script, language, voice_id, calling_hours_start, calling_hours_end, retry_limit, concurrency, status, company_id)
+- CampaignClientList (junction: campaign_id, client_list_id)
+- CampaignClient (campaign_id, client_id, call_status, call_result, retry_count, last_called_at, notes)
+- CallLog (campaign_id, client_id, vapi_call_id, duration, status, transcript, recording_url, outcome, created_at)
+- Appointment (client_id, campaign_id, company_id, scheduled_at, type: site_visit or callback, notes, status)
+- Lead (client_id, campaign_id, company_id, interest_level: hot/warm/cold, notes, created_at)
+
+---
+
+## PROJECT STRUCTURE
+
+/app
+  /superadmin         → super admin panel (separate layout)
+  /dashboard          → company admin dashboard
+  /clients            → clients tab
+  /client-lists       → manage named lists
+  /campaigns          → campaigns tab
+  /leads              → auto-generated leads
+  /call-logs          → all call history
+  /appointments       → booked visits and callbacks
+  /settings           → company settings
+  /auth               → login, register
+
+/api
+  /auth
+  /companies
+  /clients
+  /client-lists
+  /campaigns
+  /campaigns/[id]/trigger   → manually trigger campaign
+  /calls
+  /leads
+  /appointments
+  /vapi                     → VAPI webhook handler
+  /superadmin               → super admin routes
+
+/lib
+  /vapi.ts            → VAPI client wrapper
+  /prisma.ts
+  /redis.ts
+  /s3.ts
+
+---
+
+## AUTHENTICATION & MULTI-TENANCY
+
+- Registration flow: user signs up → creates a company profile → lands on dashboard
+- Every DB query must be scoped to company_id (row-level isolation)
+- Roles: super_admin, company_admin, agent
+- Super admin has a separate login route /superadmin/login
+- Protect all routes with middleware
+
+---
+
+## CLIENTS TAB
+
+Build a full CRUD page at /clients:
+- Table view with columns: name, phone, location, tags, status, source, created date
+- Add client modal (name, phone, alternate phone, location, tags, notes)
+- Bulk import via CSV upload (parse with papaparse, map columns, preview before import, detect duplicates on phone number)
+- Filters: status, tag, list, search by name or phone
+- Assign client(s) to a client list
+- View call history per client in a side drawer
+- Export to CSV
+
+---
+
+## CLIENT LISTS TAB
+
+- Create named lists (e.g. "Islamabad Investors", "DHA Lahore Leads")
+- Add/remove clients from lists
+- Show client count per list
+- Lists are used when building a campaign
+
+---
+
+## CAMPAIGNS TAB
+
+Build a full campaign management page at /campaigns:
+
+Campaign Creation Form:
+- Campaign name
+- Project name (e.g. Imaarat, Giga Mall)
+- Project description
+- Select client lists (multi-select, shows client count per list)
+- Language: Urdu, English, or Both
+- Select VAPI voice ID (dropdown)
+- AI script/prompt (pre-filled with dynamic template, editable)
+- Calling hours: start time and end time
+- Retry limit (0-3)
+- Concurrency limit (1-10 simultaneous calls)
+- Save as draft or activate
+
+Campaign List Page:
+- Table: name, project, total clients, called, remaining, interested, status, created date
+- Status badge: draft, active, paused, completed
+- Actions: view, edit (if draft), pause/resume, trigger
+
+Campaign Detail Page:
+- Stats: total clients, called, answered, no answer, interested, not interested, appointments booked, success rate, avg call duration
+- Progress bar
+- Per-client call status table with outcome and notes
+- Manual trigger button (calls server to start campaign via VAPI)
+- Pause button (stops queue mid-campaign)
+
+---
+
+## VAPI INTEGRATION
+
+In /lib/vapi.ts:
+- Initialize VAPI client using VAPI_API_KEY from env
+- Function: createOutboundCall(clientPhone, assistantConfig) → calls VAPI /call/phone endpoint
+- Function: buildAssistantConfig(campaign, client) → builds the full VAPI assistant object with:
+  - model: gpt-4o
+  - voice: ElevenLabs (voice_id from campaign)
+  - system prompt (inject campaign variables: company name, project name, price, USP, FAQ, client first name, payment plan)
+  - firstMessage: "Hi, am I speaking with {client.name}?"
+  - language detection instruction in the prompt
+  - endCallMessage on completion
+
+In /api/campaigns/[id]/trigger:
+- Validate campaign is active and within calling hours
+- Fetch all CampaignClients where call_status is pending or retry_eligible
+- Respect concurrency limit using a Redis queue (BullMQ)
+- For each client in queue: call createOutboundCall, save vapi_call_id to CallLog
+- If outside calling hours: return error "Outside allowed calling window"
+
+In /api/vapi (POST webhook):
+- Handle VAPI webhook events:
+  - call-started → update CallLog status
+  - call-ended → update duration, status, save transcript, recording_url
+  - transcript-ready → run sentiment/outcome detection, update CampaignClient call_result
+  - function-call (if using VAPI tools) → handle appointment booking trigger
+- Auto-create Lead record if outcome is "interested"
+- Auto-create Appointment if agent booked a visit during call
+
+---
+
+## AI PROMPT TEMPLATE (inject into VAPI assistant system prompt)
+
+Use this as the base, with dynamic variables replaced per campaign:
+
+"""
+You are Zara, a professional real estate sales representative calling on behalf of {{company_name}}. You are calling about {{project_name}}.
+
+Speak in the language the client uses. If they speak Urdu, respond in Urdu. If English, respond in English. If mixed, mix both naturally. Never ask which language they prefer.
+
+Your tone is confident, warm, and persuasive. You have 3-4 minutes. Stay focused.
+
+TASK 1 - GREETING:
+Greet the client by first name. Confirm identity. Introduce yourself and the project in one compelling line.
+
+TASK 2 - PROJECT PITCH:
+Cover: what it is, location, developer, key USP, payment plan. End with a qualifying question.
+Project details: {{project_description}}. Starting price: {{starting_price}}. Payment plan: {{payment_plan}}. Location: {{location}}. USP: {{usp}}.
+
+TASK 3 - QUALIFY:
+Ask: buying to live or invest? Budget? Actively looking or exploring? One question at a time. Internally classify as hot, warm, or cold.
+
+TASK 4 - FAQ:
+Answer from this list: {{faq_list}}. If unknown, say the team will follow up. Always redirect back to closing after answering.
+
+TASK 5 - OBJECTIONS:
+Price too high → highlight payment plan flexibility.
+Location concerns → highlight future development and accessibility.
+Need to think → suggest site visit to make decision easier.
+Not interested → ask if timing or project issue, log reason, close warmly.
+
+TASK 6 - CLOSE:
+Try to book a site visit first. If not, book a callback. If not, offer WhatsApp details.
+Say: "We have slots this Saturday or next Tuesday - which works for you?"
+If they agree: confirm date, time, their number.
+
+TASK 7 - CLOSING:
+Summarize next step in one sentence. Thank them. End warm.
+
+TASK 8 - FALLBACK:
+If confused after 2 attempts: "Let me have one of our team members reach out to assist you better."
+"""
+
+---
+
+## LEADS TAB
+
+- Auto-populated when call outcome = interested
+- Table: client name, phone, campaign, project, interest level, call date, notes, assigned to
+- Filter by interest level, campaign, date
+- Assign lead to an agent
+- Mark as converted, follow-up, or dead
+- Click lead → view full call transcript and recording
+
+---
+
+## CALL LOGS TAB
+
+- All calls ever made across all campaigns
+- Columns: client name, phone, campaign, call date, duration, status, outcome, recording
+- Click row → side drawer with full transcript, recording player, outcome, notes
+- Filters: date range, campaign, outcome, status
+
+---
+
+## APPOINTMENTS TAB
+
+- All booked site visits and callbacks
+- Calendar view + list view
+- Columns: client name, phone, project, type, scheduled date/time, status, assigned agent
+- Status: scheduled, completed, cancelled, no-show
+- Manual add appointment option
+
+---
+
+## ADMIN PANEL DASHBOARD
+
+Show at a glance:
+- Total clients
+- Active campaigns
+- Calls made today
+- Leads generated this week
+- Appointments this week
+- Conversion rate (interested / total called)
+- Bar chart: calls per day (last 7 days)
+- Pie chart: call outcomes breakdown
+
+---
+
+## SUPER ADMIN PANEL (/superadmin)
+
+Separate layout, separate auth.
+
+Pages:
+- Dashboard: total companies, total calls, platform-wide stats
+- Companies: list all tenants, view usage, suspend/activate
+- Users: all users across platform
+- Call Logs: platform-wide call history
+- Audit Logs: every action logged (who did what, when)
+- System Settings: VAPI default config, platform name, feature flags
+
+---
+
+## SETTINGS PAGE (per company)
+
+- Company profile (name, logo, address, website)
+- Phone numbers (linked Twilio/VAPI numbers)
+- Business hours
+- Default calling hours for campaigns
+- Notification preferences (email on new lead, on appointment booked)
+- Team members: invite by email, assign role
+
+---
+
+## ENV VARIABLES NEEDED
+
+VAPI_API_KEY=
+VAPI_PHONE_NUMBER_ID=
+DATABASE_URL=
+REDIS_URL=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_S3_BUCKET=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
+OPENAI_API_KEY=
+
+---
+
+## RULES FOR DEVELOPMENT
+
+- Every API route must validate company_id from session (no cross-tenant data leaks)
+- All forms use react-hook-form + zod validation
+- Use server actions where possible in Next.js App Router
+- All tables are paginated (default 25 per page)
+- Loading states on all async actions
+- Toast notifications on success/error
+- Mobile responsive (Tailwind)
+- All VAPI calls are logged immediately, webhook updates the record async
+- Redis queue (BullMQ) handles campaign call dispatch with concurrency control
+- Calling hours enforced server-side, not just UI
+- CSV import validates phone format before inserting
+- Duplicate phone detection on import and manual entry
