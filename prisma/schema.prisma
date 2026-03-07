@@ -1,0 +1,209 @@
+// Prisma schema for MySQL
+// https://prisma.io/docs/orm/reference/prisma-schema-reference
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  company   String?
+  password  String    // store hashed in production
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  clients      Client[]
+  clientLists  ClientList[]
+  campaigns    Campaign[]
+  leads        Lead[]
+  companySetting CompanySetting?
+  teamMembers    TeamMember[]
+}
+
+enum ClientStatus {
+  active
+  inactive
+  do_not_call
+}
+
+model Client {
+  id             String        @id @default(cuid())
+  userId         String
+  name           String
+  phone          String
+  location       String?
+  tags           String?       // comma-separated list of tags
+  status         ClientStatus  @default(active)
+  source         String?       // e.g. Manual, CSV Import, Website
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listMemberships ClientListMembership[]
+  leads          Lead[]
+
+  @@index([userId])
+  @@index([phone])
+}
+
+model ClientList {
+  id          String                @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  campaigns   Int                   @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memberships ClientListMembership[]
+  campaignLinks CampaignClientList[]
+
+  @@index([userId])
+  @@unique([userId, name])
+}
+
+model ClientListMembership {
+  id        String     @id @default(cuid())
+  clientId  String
+  listId    String
+  createdAt DateTime   @default(now())
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  list      ClientList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, listId])
+  @@index([listId])
+}
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  completed
+}
+
+model Campaign {
+  id           String          @id @default(cuid())
+  userId       String
+  name         String
+  project      String
+  language     String
+  concurrency  Int             @default(1)
+
+  // Optional configuration fields
+  clientListKey String?
+  voiceId       String?
+  greeting      String?
+  prompt        String?
+  maxRetries    Int            @default(0)
+  callStart     String?
+  callEnd       String?
+
+  // Simple aggregate metrics for dashboard
+  totalClients  Int            @default(0)
+  called        Int            @default(0)
+  remaining     Int            @default(0)
+  interested    Int            @default(0)
+
+  status      CampaignStatus   @default(draft)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listLinks   CampaignClientList[]
+
+  leads       Lead[]
+
+  @@index([userId])
+}
+
+model CampaignClientList {
+  id           String      @id @default(cuid())
+  campaignId   String
+  clientListId String
+  createdAt    DateTime    @default(now())
+
+  campaign     Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  clientList   ClientList  @relation(fields: [clientListId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, clientListId])
+  @@index([clientListId])
+}
+
+enum LeadInterestLevel {
+  hot
+  warm
+  cold
+}
+
+enum LeadStatus {
+  new
+  follow_up
+  converted
+  dead
+}
+
+model Lead {
+  id          String           @id @default(cuid())
+  userId      String
+  clientId    String?
+  campaignId  String?
+  name        String
+  phone       String
+  campaign    String?
+  project     String?
+  interest    LeadInterestLevel
+  status      LeadStatus       @default(new)
+  assignedTo  String?
+  notes       String?
+  date        DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client      Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  campaignRef Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([campaignId])
+}
+
+model CompanySetting {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  companyName        String?
+  website            String?
+  address            String?
+  callStart          String?  // "HH:mm"
+  callEnd            String?
+  notifyNewLead      Boolean  @default(true)
+  notifyAppointment  Boolean  @default(true)
+  notifyCampaignDone Boolean  @default(false)
+  notifyDailySummary Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String
+  role      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

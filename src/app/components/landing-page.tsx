@@ -9,6 +9,7 @@ import {
   Sparkles, TrendingUp, MessageSquare, Settings,
 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { Logo } from "./ui/logo";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -42,7 +43,7 @@ const testimonials = [
   {
     name: "Sarah Mitchell",
     role: "CEO, Premier Properties",
-    text: "VoiceEstate transformed our outreach. We went from 50 calls a day to 2,000 — and our conversion rate actually improved by 3x.",
+    text: "Convaire transformed our outreach. We went from 50 calls a day to 2,000 — and our conversion rate actually improved by 3x.",
     img: "https://images.unsplash.com/photo-1689600944138-da3b150d9cb8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMGJ1c2luZXNzJTIwd29tYW58ZW58MXx8fHwxNzcyNDAyNjY1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     rating: 5,
   },
@@ -244,10 +245,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center shadow-lg shadow-[#1a8ee9]/25">
-                <Headphones className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-xl text-[#0f172a]" style={{ fontWeight: 600 }}>VoiceEstate</span>
+              <Logo dark={true} />
             </div>
             <div className="hidden lg:flex items-center gap-8">
               {["Features", "How It Works", "Pricing", "FAQ"].map((item) => (
@@ -327,7 +325,7 @@ export function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-[#10b981]/70" />
                 </div>
                 <div className="flex-1 flex justify-center">
-                  <div className="bg-[#f1f5f9] rounded-[5px] px-4 py-1 text-xs text-[#94a3b8] max-w-xs w-full text-center">app.voiceestate.com/dashboard</div>
+                  <div className="bg-[#f1f5f9] rounded-[5px] px-4 py-1 text-xs text-[#94a3b8] max-w-xs w-full text-center">app.convaire.com/dashboard</div>
                 </div>
               </div>
               {/* Dashboard simulation */}
@@ -569,11 +567,10 @@ export function LandingPage() {
                 </div>
                 <button
                   onClick={() => navigate("/signup")}
-                  className={`w-full py-3 rounded-[5px] text-sm transition-all ${
-                    p.popular
+                  className={`w-full py-3 rounded-[5px] text-sm transition-all ${p.popular
                       ? "bg-[#1a8ee9] hover:bg-[#0b5b9a] text-white shadow-lg shadow-[#1a8ee9]/20"
                       : "bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a]"
-                  }`}
+                    }`}
                   style={{ fontWeight: 500 }}
                 >
                   {p.cta}
@@ -636,7 +633,7 @@ export function LandingPage() {
               Ready to 10x Your Real Estate Calls?
             </h2>
             <p className="text-[#94a3b8] text-base lg:text-lg max-w-2xl mx-auto mb-8">
-              Join 340+ agencies already using VoiceEstate to close more deals with AI. Start your free 14-day trial today.
+              Join 340+ agencies already using Convaire to close more deals with AI. Start your free 14-day trial today.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <button onClick={() => navigate("/signup")} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#1a8ee9] hover:bg-[#0b5b9a] text-white px-8 py-3.5 rounded-[5px] text-sm shadow-xl shadow-[#1a8ee9]/30 transition-all" style={{ fontWeight: 500 }}>
@@ -656,10 +653,8 @@ export function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
             <div className="col-span-2 md:col-span-4 lg:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center">
-                  <Headphones className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="text-lg text-[#0f172a]" style={{ fontWeight: 600 }}>VoiceEstate</span>
+                <Logo dark={true} showText={false} className="scale-75 origin-left" />
+                <span className="text-lg text-[#0f172a]" style={{ fontWeight: 600 }}>Convaire</span>
               </div>
               <p className="text-sm text-[#64748b] leading-relaxed max-w-xs">
                 AI-powered voice calling platform built for real estate professionals.
@@ -682,7 +677,7 @@ export function LandingPage() {
             ))}
           </div>
           <div className="mt-12 pt-8 border-t border-[#e2e8f0] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-[#94a3b8]">&copy; 2026 VoiceEstate. All rights reserved.</p>
+            <p className="text-xs text-[#94a3b8]">&copy; 2026 Convaire. All rights reserved.</p>
             <div className="flex gap-6">
               {["Twitter", "LinkedIn", "GitHub"].map((s) => (
                 <span key={s} className="text-xs text-[#94a3b8] hover:text-[#1a8ee9] cursor-pointer transition-colors">{s}</span>

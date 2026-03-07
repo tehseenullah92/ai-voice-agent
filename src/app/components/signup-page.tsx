@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
+import { useAuth } from "../auth";
 import { AuthLayout } from "./auth-layout";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -27,6 +28,7 @@ const passwordRules = [
 
 export function SignUpPage() {
   const navigate = useNavigate();
+  const { signup, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -63,10 +65,25 @@ export function SignUpPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigate("/verify-email", { state: { email: formData.email } });
-    }, 1200);
+    signup({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      company: formData.company,
+    })
+      .then(() => {
+        navigate("/verify-email", { state: { email: formData.email } });
+      })
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to create account. Please try again."
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -251,11 +268,11 @@ export function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || authLoading}
             className="w-full h-10 bg-[#1a8ee9] hover:bg-[#0b5b9a] text-white rounded-[5px] text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ fontWeight: 500 }}
           >
-            {loading ? (
+            {loading || authLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>

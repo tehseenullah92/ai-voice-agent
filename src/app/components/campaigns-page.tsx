@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -16,9 +16,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "./ui/select";
 import {
-  Megaphone, Plus, Play, Pause, Eye, Pencil, Zap, Phone, Users, Target, Clock, Globe,
+  Megaphone, Plus, Play, Pause, Eye, Pencil, Zap, Phone, Users, Target, Clock, Globe, Loader2,
 } from "lucide-react";
-import { campaigns as initialCampaigns } from "./mock-data";
+import { useAuth } from "../auth";
 import { toast } from "sonner";
 
 type CampaignStatus = "active" | "completed" | "draft" | "paused";
@@ -35,67 +35,240 @@ const defaultForm = {
   voiceId: "", greeting: "", prompt: "", maxRetries: "2", callHoursStart: "09:00", callHoursEnd: "18:00",
 };
 
+type Campaign = {
+  id: string;
+  name: string;
+  project: string;
+  totalClients: number;
+  called: number;
+  remaining: number;
+  interested: number;
+  status: CampaignStatus;
+  createdAt: string;
+  language: string;
+  concurrency: number;
+  clientListId?: string | null;
+};
+
+type ClientListOption = {
+  id: string;
+  name: string;
+  memberCount: number;
+};
+
 export function CampaignsPage() {
-  const [campaignsList, setCampaignsList] = useState(initialCampaigns);
+  const { user } = useAuth();
+  const [campaignsList, setCampaignsList] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [clientLists, setClientLists] = useState<ClientListOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<typeof initialCampaigns[0] | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [form, setForm] = useState(defaultForm);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) return;
+      setLoading(true);
+      try {
+        const [campaignsRes, listsRes] = await Promise.all([
+          fetch("/api/campaigns", {
+            headers: { "x-user-email": user.email },
+          }),
+          fetch("/api/client-lists", {
+            headers: { "x-user-email": user.email },
+          }),
+        ]);
+
+        if (!campaignsRes.ok) {
+          const data = await campaignsRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load campaigns");
+        }
+        if (!listsRes.ok) {
+          const data = await listsRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load client lists");
+        }
+
+        const campaignsJson = await campaignsRes.json();
+        const listsJson = await listsRes.json();
+
+        const mapped: Campaign[] = (campaignsJson.campaigns ?? []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          project: c.project,
+          totalClients: c.totalClients ?? 0,
+          called: c.called ?? 0,
+          remaining: c.remaining ?? 0,
+          interested: c.interested ?? 0,
+          status: c.status as CampaignStatus,
+          createdAt: c.createdAt?.split("T")[0] ?? "",
+          language: c.language ?? "Urdu",
+          concurrency: c.concurrency ?? 5,
+          clientListId: c.clientListKey ?? null,
+        }));
+        setCampaignsList(mapped);
+
+        const mappedLists: ClientListOption[] = (listsJson.lists ?? []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          memberCount: (l.memberIds ?? []).length,
+        }));
+        setClientLists(mappedLists);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to load campaigns");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [user?.email]);
 
   const handleCreate = () => {
     if (!form.name || !form.project) {
       toast.error("Campaign name and project are required");
       return;
     }
-    const newCampaign = {
-      id: String(campaignsList.length + 1),
-      name: form.name,
-      project: form.project,
-      totalClients: 0,
-      called: 0,
-      remaining: 0,
-      interested: 0,
-      status: "draft" as const,
-      createdAt: new Date().toISOString().split("T")[0],
-      language: form.language,
-      concurrency: parseInt(form.concurrency),
+    const create = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/campaigns", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            name: form.name,
+            project: form.project,
+            language: form.language,
+            concurrency: form.concurrency,
+            clientList: form.clientList,
+            voiceId: form.voiceId,
+            greeting: form.greeting,
+            prompt: form.prompt,
+            maxRetries: form.maxRetries,
+            callHoursStart: form.callHoursStart,
+            callHoursEnd: form.callHoursEnd,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to create campaign");
+        }
+        const data = await res.json();
+        const c = data.campaign;
+        const mapped: Campaign = {
+          id: c.id,
+          name: c.name,
+          project: c.project,
+          totalClients: c.totalClients ?? 0,
+          called: c.called ?? 0,
+          remaining: c.remaining ?? 0,
+          interested: c.interested ?? 0,
+          status: c.status as CampaignStatus,
+          createdAt: c.createdAt?.split("T")[0] ?? "",
+          language: c.language ?? "Urdu",
+          concurrency: c.concurrency ?? 5,
+        };
+        setCampaignsList((prev) => [mapped, ...prev]);
+        setForm(defaultForm);
+        setCreateOpen(false);
+        toast.success(`Campaign "${mapped.name}" created as draft`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to create campaign");
+      }
     };
-    setCampaignsList((prev) => [newCampaign, ...prev]);
-    setForm(defaultForm);
-    setCreateOpen(false);
-    toast.success(`Campaign "${newCampaign.name}" created as draft`);
+
+    void create();
   };
 
   const handleEdit = () => {
     if (!selectedCampaign || !form.name) return;
-    setCampaignsList((prev) =>
-      prev.map((c) =>
-        c.id === selectedCampaign.id
-          ? { ...c, name: form.name, project: form.project, language: form.language, concurrency: parseInt(form.concurrency) }
-          : c
-      )
-    );
-    setEditOpen(false);
-    toast.success("Campaign updated successfully");
+    const update = async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${selectedCampaign.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            project: form.project,
+            language: form.language,
+            concurrency: form.concurrency,
+            clientList: form.clientList,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to update campaign");
+        }
+        const data = await res.json();
+        const updated = data.campaign;
+        setCampaignsList((prev) =>
+          prev.map((c) =>
+            c.id === selectedCampaign.id
+              ? {
+                  ...c,
+                  name: updated.name,
+                  project: updated.project,
+                  language: updated.language ?? "Urdu",
+                  concurrency: updated.concurrency ?? c.concurrency,
+                  clientListId: updated.clientListKey ?? c.clientListId,
+                }
+              : c
+          )
+        );
+        setEditOpen(false);
+        toast.success("Campaign updated successfully");
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to update campaign");
+      }
+    };
+
+    void update();
   };
 
   const toggleStatus = (id: string, newStatus: CampaignStatus) => {
-    setCampaignsList((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
-    );
-    const labels: Record<string, string> = {
-      active: "started", paused: "paused", draft: "reset to draft",
+    const update = async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to update status");
+        }
+        setCampaignsList((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+        );
+        const labels: Record<string, string> = {
+          active: "started",
+          paused: "paused",
+          draft: "reset to draft",
+          completed: "completed",
+        };
+        toast.success(`Campaign ${labels[newStatus] || newStatus}`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to update status");
+      }
     };
-    toast.success(`Campaign ${labels[newStatus] || newStatus}`);
+
+    void update();
   };
 
-  const openView = (campaign: typeof initialCampaigns[0]) => {
+  const openView = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setViewOpen(true);
   };
 
-  const openEditDialog = (campaign: typeof initialCampaigns[0]) => {
+  const openEditDialog = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setForm({
       ...defaultForm,
@@ -103,6 +276,7 @@ export function CampaignsPage() {
       project: campaign.project,
       language: campaign.language,
       concurrency: String(campaign.concurrency),
+      clientList: campaign.clientListId ?? "",
     });
     setEditOpen(true);
   };
@@ -159,6 +333,14 @@ export function CampaignsPage() {
       {/* Table */}
       <Card>
         <CardContent className="pt-0 px-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              <span className="text-sm text-muted-foreground">
+                Loading campaigns...
+              </span>
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -265,6 +447,7 @@ export function CampaignsPage() {
               })}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -328,10 +511,12 @@ export function CampaignsPage() {
                   <SelectValue placeholder="Select a client list..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="islamabad-investors">Islamabad Investors (234)</SelectItem>
-                  <SelectItem value="dha-lahore">DHA Lahore Leads (156)</SelectItem>
-                  <SelectItem value="karachi-hnw">Karachi High Net Worth (89)</SelectItem>
-                  <SelectItem value="overseas">Overseas Pakistanis (178)</SelectItem>
+                  {clientLists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name}
+                      {list.memberCount > 0 ? ` (${list.memberCount})` : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -480,6 +665,24 @@ export function CampaignsPage() {
                   <p className="text-sm">{selectedCampaign.createdAt}</p>
                 </div>
               </div>
+
+              {selectedCampaign.clientListId && (
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Client List
+                  </p>
+                  <p className="text-sm">
+                    {clientLists.find((l) => l.id === selectedCampaign.clientListId)?.name ??
+                      "Unknown list"}
+                    {(() => {
+                      const list = clientLists.find((l) => l.id === selectedCampaign.clientListId);
+                      return list && list.memberCount > 0
+                        ? ` • ${list.memberCount} clients`
+                        : "";
+                    })()}
+                  </p>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -549,10 +752,29 @@ export function CampaignsPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Client List</Label>
+              <Select
+                value={form.clientList}
+                onValueChange={(v) => setForm({ ...form, clientList: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a client list..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientLists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name}
+                      {list.memberCount > 0 ? ` (${list.memberCount})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEdit}>Save Changes</Button>
+            <Button onClick={handleEdit}>Update Campaign</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

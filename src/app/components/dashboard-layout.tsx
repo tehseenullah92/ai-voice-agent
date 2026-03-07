@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Toaster, toast } from "sonner";
+import { useAuth } from "../auth";
 
 const mockNotifications = [
   { id: "1", title: "New Hot Lead", description: "Ahmed Khan showed interest in DHA Phase 5", time: "2 min ago", read: false, icon: Target, color: "text-red-500" },
@@ -23,6 +24,7 @@ const mockNotifications = [
 
 export function DashboardLayout() {
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
   const [notifications, setNotifications] = useState(mockNotifications);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -163,8 +165,12 @@ export function DashboardLayout() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 lg:gap-3 hover:bg-muted rounded-[5px] px-2 py-1.5 transition-colors">
                   <div className="text-right hidden md:block">
-                    <p className="text-sm">Realty Corp</p>
-                    <p className="text-xs text-muted-foreground">Admin</p>
+                    <p className="text-sm">
+                      {user?.company || "Realty Corp"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.email || "admin@realtycorp.pk"}
+                    </p>
                   </div>
                   <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center shadow-md shadow-[#1a8ee9]/20">
                     <User className="w-4 h-4 text-white" />
@@ -174,8 +180,12 @@ export function DashboardLayout() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div>
-                    <p className="text-sm">Admin User</p>
-                    <p className="text-xs text-muted-foreground">admin@realtycorp.pk</p>
+                    <p className="text-sm">
+                      {user?.name || "Admin User"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.email || "admin@realtycorp.pk"}
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -201,7 +211,11 @@ export function DashboardLayout() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={() => { toast.info("Logged out successfully"); navigate("/signin"); }}
+                  onClick={() => {
+                    logout();
+                    toast.info("Logged out successfully");
+                    navigate("/signin");
+                  }}
                 >
                   <LogOut className="w-4 h-4" />
                   Log Out

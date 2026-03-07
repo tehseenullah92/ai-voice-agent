@@ -97,7 +97,7 @@ export function VerifyEmailPage() {
           </h2>
           <p className="text-sm text-[#64748b] mb-8 leading-relaxed">
             Your account has been successfully verified. You're all set to start
-            using VoiceEstate.
+            using Convaire.
           </p>
 
           <button
@@ -162,11 +162,10 @@ export function VerifyEmailPage() {
               value={digit}
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
-              className={`w-12 h-14 text-center text-xl rounded-[5px] border outline-none transition-all ${
-                digit
+              className={`w-12 h-14 text-center text-xl rounded-[5px] border outline-none transition-all ${digit
                   ? "border-[#1a8ee9] bg-[#1a8ee9]/5 text-[#0f172a]"
                   : "border-[#e2e8f0] bg-white text-[#0f172a]"
-              } focus:border-[#1a8ee9] focus:ring-2 focus:ring-[#1a8ee9]/20`}
+                } focus:border-[#1a8ee9] focus:ring-2 focus:ring-[#1a8ee9]/20`}
               style={{ fontWeight: 600 }}
             />
           ))}

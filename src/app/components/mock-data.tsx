@@ -1,4 +1,4 @@
-// Mock data for VoiceEstate Dashboard
+// Mock data for Convaire Dashboard
 
 export const dashboardStats = {
   totalClients: 2847,

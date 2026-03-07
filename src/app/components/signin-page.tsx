@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
+import { useAuth } from "../auth";
 import { AuthLayout } from "./auth-layout";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -7,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 export function SignInPage() {
   const navigate = useNavigate();
+  const { login, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -23,10 +25,18 @@ export function SignInPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigate("/dashboard");
-    }, 1200);
+    login({ email, password })
+      .then(() => {
+        navigate("/dashboard");
+      })
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error ? err.message : "Unable to sign in. Please try again."
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -39,7 +49,7 @@ export function SignInPage() {
           Welcome back
         </h2>
         <p className="text-sm text-[#64748b] mb-8">
-          Sign in to your VoiceEstate account to continue.
+          Sign in to your Convaire account to continue.
         </p>
 
         {/* Social Sign In */}
@@ -156,11 +166,11 @@ export function SignInPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || authLoading}
             className="w-full h-10 bg-[#1a8ee9] hover:bg-[#0b5b9a] text-white rounded-[5px] text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ fontWeight: 500 }}
           >
-            {loading ? (
+            {loading || authLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>

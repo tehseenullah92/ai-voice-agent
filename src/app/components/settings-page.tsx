@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -15,24 +15,81 @@ import {
   Building2, Phone, Clock, Bell, Users, Save, Plus, Mail, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../auth";
 import { useNavigate } from "react-router";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function SettingsPage() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  const [company, setCompany] = useState({
+    companyName: "Realty Corp Pakistan",
+    website: "https://realtycorp.pk",
+    address: "Blue Area, Jinnah Avenue, Islamabad",
+    callStart: "09:00",
+    callEnd: "18:00",
+  });
+
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState([
-    { id: "1", label: "Email on new lead generated", enabled: true },
-    { id: "2", label: "Email on appointment booked", enabled: true },
-    { id: "3", label: "Email on campaign completed", enabled: false },
-    { id: "4", label: "Daily summary report", enabled: true },
+    { id: "notifyNewLead", label: "Email on new lead generated", enabled: true },
+    { id: "notifyAppointment", label: "Email on appointment booked", enabled: true },
+    { id: "notifyCampaignDone", label: "Email on campaign completed", enabled: false },
+    { id: "notifyDailySummary", label: "Daily summary report", enabled: true },
   ]);
 
   const toggleNotif = (id: string) => {
     setNotifPrefs((prev) =>
       prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p))
     );
+
+    const next = notifPrefs.map((p) =>
+      p.id === id ? { ...p, enabled: !p.enabled } : p
+    );
+
+    const payload: any = {};
+    next.forEach((p) => {
+      payload[p.id] = p.enabled;
+    });
+
+    const save = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/settings/company", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to save notification preferences");
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to save notification preferences");
+      }
+    };
+
+    void save();
+
     const pref = notifPrefs.find((p) => p.id === id);
     if (pref) {
-      toast.success(`${pref.label}: ${pref.enabled ? "Disabled" : "Enabled"}`);
+      toast.success(
+        `${pref.label}: ${pref.enabled ? "Disabled" : "Enabled"}`
+      );
     }
   };
 
@@ -66,26 +123,163 @@ export function SettingsPage() {
   };
 
   // Team members
-  const [members, setMembers] = useState([
-    { id: "1", name: "Admin User", email: "admin@realtycorp.pk", role: "Admin" },
-    { id: "2", name: "Ali Agent", email: "ali@realtycorp.pk", role: "Agent" },
-    { id: "3", name: "Sara Agent", email: "sara@realtycorp.pk", role: "Agent" },
-  ]);
+  const [members, setMembers] = useState<
+    { id: string; name: string; email: string; role: string }[]
+  >([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "Agent" });
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
 
   const handleInvite = () => {
     if (!inviteForm.email || !inviteForm.name) {
       toast.error("Name and email are required");
       return;
     }
-    setMembers((prev) => [
-      ...prev,
-      { id: String(prev.length + 1), ...inviteForm },
-    ]);
-    setInviteForm({ name: "", email: "", role: "Agent" });
-    setInviteOpen(false);
-    toast.success(`Invitation sent to ${inviteForm.email}`);
+    const invite = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/settings/team-members", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            name: inviteForm.name,
+            inviteEmail: inviteForm.email,
+            role: inviteForm.role,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to invite member");
+        }
+        const data = await res.json();
+        setMembers((prev) => [...prev, data.member]);
+        setInviteForm({ name: "", email: "", role: "Agent" });
+        setInviteOpen(false);
+        toast.success(`Invitation sent to ${inviteForm.email}`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to invite member");
+      }
+    };
+
+    void invite();
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) return;
+      setLoading(true);
+      try {
+        const [companyRes, membersRes] = await Promise.all([
+          fetch("/api/settings/company", {
+            headers: { "x-user-email": user.email },
+          }),
+          fetch("/api/settings/team-members", {
+            headers: { "x-user-email": user.email },
+          }),
+        ]);
+
+        if (!companyRes.ok) {
+          const data = await companyRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load settings");
+        }
+        if (!membersRes.ok) {
+          const data = await membersRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load team members");
+        }
+
+        const companyJson = await companyRes.json();
+        const membersJson = await membersRes.json();
+
+        const s = companyJson.settings;
+        if (s) {
+          setCompany({
+            companyName: s.companyName || "",
+            website: s.website || "",
+            address: s.address || "",
+            callStart: s.callStart || "09:00",
+            callEnd: s.callEnd || "18:00",
+          });
+          setNotifPrefs((prev) =>
+            prev.map((p) => ({
+              ...p,
+              enabled: Boolean(s[p.id]),
+            }))
+          );
+        }
+
+        setMembers(membersJson.members ?? []);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to load settings");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [user?.email]);
+
+  const saveCompanyProfile = () => {
+    const save = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/settings/company", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            companyName: company.companyName,
+            website: company.website,
+            address: company.address,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to save company profile");
+        }
+        toast.success("Company profile saved");
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to save company profile");
+      }
+    };
+
+    void save();
+  };
+
+  const saveHours = () => {
+    const save = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/settings/company", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            callStart: company.callStart,
+            callEnd: company.callEnd,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to save calling hours");
+        }
+        toast.success("Calling hours saved");
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to save calling hours");
+      }
+    };
+
+    void save();
   };
 
   return (
@@ -111,7 +305,10 @@ export function SettingsPage() {
               <label className="text-sm text-muted-foreground">Company Name</label>
               <input
                 type="text"
-                defaultValue="Realty Corp Pakistan"
+                value={company.companyName}
+                onChange={(e) =>
+                  setCompany((prev) => ({ ...prev, companyName: e.target.value }))
+                }
                 className="w-full mt-1 border border-border rounded-lg px-3 py-2 text-sm bg-input-background"
               />
             </div>
@@ -119,7 +316,10 @@ export function SettingsPage() {
               <label className="text-sm text-muted-foreground">Website</label>
               <input
                 type="text"
-                defaultValue="https://realtycorp.pk"
+                value={company.website}
+                onChange={(e) =>
+                  setCompany((prev) => ({ ...prev, website: e.target.value }))
+                }
                 className="w-full mt-1 border border-border rounded-lg px-3 py-2 text-sm bg-input-background"
               />
             </div>
@@ -127,12 +327,15 @@ export function SettingsPage() {
               <label className="text-sm text-muted-foreground">Address</label>
               <input
                 type="text"
-                defaultValue="Blue Area, Jinnah Avenue, Islamabad"
+                value={company.address}
+                onChange={(e) =>
+                  setCompany((prev) => ({ ...prev, address: e.target.value }))
+                }
                 className="w-full mt-1 border border-border rounded-lg px-3 py-2 text-sm bg-input-background"
               />
             </div>
           </div>
-          <Button size="sm" className="mt-4" onClick={() => toast.success("Company profile saved")}>
+          <Button size="sm" className="mt-4" onClick={saveCompanyProfile}>
             <Save className="w-4 h-4" />
             Save Changes
           </Button>
@@ -189,7 +392,10 @@ export function SettingsPage() {
               <label className="text-sm text-muted-foreground">Start Time</label>
               <input
                 type="time"
-                defaultValue="09:00"
+                value={company.callStart}
+                onChange={(e) =>
+                  setCompany((prev) => ({ ...prev, callStart: e.target.value }))
+                }
                 className="w-full mt-1 border border-border rounded-lg px-3 py-2 text-sm bg-input-background"
               />
             </div>
@@ -197,12 +403,15 @@ export function SettingsPage() {
               <label className="text-sm text-muted-foreground">End Time</label>
               <input
                 type="time"
-                defaultValue="18:00"
+                value={company.callEnd}
+                onChange={(e) =>
+                  setCompany((prev) => ({ ...prev, callEnd: e.target.value }))
+                }
                 className="w-full mt-1 border border-border rounded-lg px-3 py-2 text-sm bg-input-background"
               />
             </div>
           </div>
-          <Button size="sm" className="mt-4" onClick={() => toast.success("Calling hours saved")}>
+          <Button size="sm" className="mt-4" onClick={saveHours}>
             <Save className="w-4 h-4" />
             Save Hours
           </Button>
@@ -256,7 +465,16 @@ export function SettingsPage() {
                     <p className="text-xs text-muted-foreground">{member.email}</p>
                   </div>
                 </div>
-                <Badge variant="secondary">{member.role}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{member.role}</Badge>
+                  <button
+                    className="p-1.5 rounded-md hover:bg-accent"
+                    onClick={() => setDeletingMemberId(member.id)}
+                    title="Remove member"
+                  >
+                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -310,7 +528,7 @@ export function SettingsPage() {
           <DialogHeader>
             <DialogTitle>Invite Team Member</DialogTitle>
             <DialogDescription>
-              Send an invitation to join your VoiceEstate workspace.
+              Send an invitation to join your Convaire workspace.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -354,6 +572,54 @@ export function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Member Confirmation */}
+      <AlertDialog
+        open={!!deletingMemberId}
+        onOpenChange={(open) => {
+          if (!open) setDeletingMemberId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove team member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the member from your workspace. It will not delete their user account or data in the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingMemberId(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deletingMemberId) return;
+                const id = deletingMemberId;
+                setDeletingMemberId(null);
+                try {
+                  const res = await fetch(`/api/settings/team-members/${id}`, {
+                    method: "DELETE",
+                  });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(
+                      data.error || "Failed to delete team member"
+                    );
+                  }
+                  setMembers((prev) => prev.filter((m) => m.id !== id));
+                  toast.success("Team member removed");
+                } catch (err: any) {
+                  console.error(err);
+                  toast.error(err.message || "Failed to delete team member");
+                }
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

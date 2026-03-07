@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -8,15 +8,25 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "./ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   ListChecks, Plus, Users, Pencil, Trash2, FolderOpen, Search, X, Phone, MapPin,
-  UserPlus, UserMinus, CheckCircle2,
+  UserPlus, UserMinus, CheckCircle2, Loader2,
 } from "lucide-react";
-import { clients as allClients, clientListMembers as initialMembership } from "./mock-data";
+import { useAuth } from "../auth";
 import { toast } from "sonner";
 
 const statusStyles: Record<string, string> = {
@@ -25,24 +35,38 @@ const statusStyles: Record<string, string> = {
   do_not_call: "bg-red-100 text-red-700 border-red-200",
 };
 
-const initialClientLists = [
-  { id: "1", name: "Islamabad Investors", description: "High net worth investors from Islamabad region", campaigns: 2, createdAt: "2026-01-10" },
-  { id: "2", name: "DHA Lahore Leads", description: "Leads interested in DHA Lahore projects", campaigns: 1, createdAt: "2026-01-15" },
-  { id: "3", name: "Karachi High Net Worth", description: "Premium clients from Karachi area", campaigns: 3, createdAt: "2026-01-20" },
-  { id: "4", name: "Rawalpindi End Users", description: "End users looking for residential properties", campaigns: 0, createdAt: "2026-02-01" },
-  { id: "5", name: "Overseas Pakistanis", description: "Overseas investors interested in Pakistan real estate", campaigns: 1, createdAt: "2026-02-05" },
-  { id: "6", name: "Bahria Town Interested", description: "Clients showing interest in Bahria Town projects", campaigns: 2, createdAt: "2026-02-10" },
-];
+type ClientStatus = "active" | "inactive" | "do_not_call";
+
+type Client = {
+  id: string;
+  name: string;
+  phone: string;
+  location: string;
+  tags: string[];
+  status: ClientStatus;
+};
+
+type ClientList = {
+  id: string;
+  name: string;
+  description?: string | null;
+  campaigns: number;
+  createdAt: string;
+};
 
 export function ClientListsPage() {
-  const [lists, setLists] = useState(initialClientLists);
-  const [membership, setMembership] = useState<Record<string, string[]>>(initialMembership);
+  const { user } = useAuth();
+  const [lists, setLists] = useState<ClientList[]>([]);
+  const [membership, setMembership] = useState<Record<string, string[]>>({});
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [editingList, setEditingList] = useState<typeof initialClientLists[0] | null>(null);
+  const [editingList, setEditingList] = useState<ClientList | null>(null);
   const [form, setForm] = useState({ name: "", description: "" });
   const [memberSearch, setMemberSearch] = useState("");
   const [addClientSearch, setAddClientSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<ClientList | null>(null);
 
   const getMembers = (listId: string) => {
     const ids = membership[listId] || [];
@@ -54,70 +78,231 @@ export function ClientListsPage() {
     return allClients.filter((c) => !ids.includes(c.id));
   };
 
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) return;
+      setLoading(true);
+      try {
+        const [listsRes, clientsRes] = await Promise.all([
+          fetch("/api/client-lists", {
+            headers: { "x-user-email": user.email },
+          }),
+          fetch("/api/clients", {
+            headers: { "x-user-email": user.email },
+          }),
+        ]);
+
+        if (!listsRes.ok) throw new Error("Failed to load lists");
+        if (!clientsRes.ok) throw new Error("Failed to load clients");
+
+        const listsJson = await listsRes.json();
+        const clientsJson = await clientsRes.json();
+
+        const mappedLists: ClientList[] = (listsJson.lists ?? []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          description: l.description,
+          campaigns: l.campaigns ?? 0,
+          createdAt: l.createdAt?.split("T")[0] ?? "",
+        }));
+        setLists(mappedLists);
+
+        const membershipMap: Record<string, string[]> = {};
+        for (const l of listsJson.lists ?? []) {
+          membershipMap[l.id] = l.memberIds ?? [];
+        }
+        setMembership(membershipMap);
+
+        const mappedClients: Client[] = (clientsJson.clients ?? []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          location: c.location ?? "N/A",
+          tags: c.tags ? String(c.tags).split(",").map((t: string) => t.trim()).filter(Boolean) : [],
+          status: c.status as ClientStatus,
+        }));
+        setAllClients(mappedClients);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load client lists from server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [user?.email]);
+
   const handleCreate = () => {
     if (!form.name) {
       toast.error("List name is required");
       return;
     }
-    const newId = String(Date.now());
-    const newList = {
-      id: newId,
-      name: form.name,
-      description: form.description,
-      campaigns: 0,
-      createdAt: new Date().toISOString().split("T")[0],
+    const create = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/client-lists", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            name: form.name,
+            description: form.description,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to create list");
+        }
+
+        const data = await res.json();
+        const list = data.list;
+        const newList: ClientList = {
+          id: list.id,
+          name: list.name,
+          description: list.description,
+          campaigns: list.campaigns ?? 0,
+          createdAt: list.createdAt?.split("T")[0] ?? "",
+        };
+
+        setLists((prev) => [newList, ...prev]);
+        setMembership((prev) => ({ ...prev, [newList.id]: [] }));
+        setForm({ name: "", description: "" });
+        setCreateOpen(false);
+        toast.success(`List "${newList.name}" created successfully`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to create list");
+      }
     };
-    setLists((prev) => [newList, ...prev]);
-    setMembership((prev) => ({ ...prev, [newId]: [] }));
-    setForm({ name: "", description: "" });
-    setCreateOpen(false);
-    toast.success(`List "${newList.name}" created successfully`);
+
+    void create();
   };
 
   const handleEdit = () => {
     if (!editingList || !form.name) return;
-    setLists((prev) =>
-      prev.map((l) =>
-        l.id === editingList.id ? { ...l, name: form.name, description: form.description } : l
-      )
-    );
-    setEditOpen(false);
-    setEditingList(null);
-    toast.success("List updated successfully");
+
+    const update = async () => {
+      try {
+        const res = await fetch(`/api/client-lists/${editingList.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            description: form.description,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to update list");
+        }
+        setLists((prev) =>
+          prev.map((l) =>
+            l.id === editingList.id
+              ? { ...l, name: form.name, description: form.description }
+              : l
+          )
+        );
+        setEditOpen(false);
+        setEditingList(null);
+        toast.success("List updated successfully");
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to update list");
+      }
+    };
+
+    void update();
   };
 
-  const openEdit = (list: typeof initialClientLists[0]) => {
+  const openEdit = (list: ClientList) => {
     setEditingList(list);
-    setForm({ name: list.name, description: list.description });
+    setForm({ name: list.name, description: list.description ?? "" });
     setMemberSearch("");
     setAddClientSearch("");
     setEditOpen(true);
   };
 
   const handleDelete = (id: string, name: string) => {
-    setLists((prev) => prev.filter((l) => l.id !== id));
-    setMembership((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    toast.success(`List "${name}" deleted`);
+    const remove = async () => {
+      try {
+        const res = await fetch(`/api/client-lists/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to delete list");
+        }
+        setLists((prev) => prev.filter((l) => l.id !== id));
+        setMembership((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        toast.success(`List "${name}" deleted`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to delete list");
+      }
+    };
+
+    void remove();
   };
 
   const addClientToList = (listId: string, clientId: string, clientName: string) => {
-    setMembership((prev) => ({
-      ...prev,
-      [listId]: [...(prev[listId] || []), clientId],
-    }));
-    toast.success(`${clientName} added to list`);
+    const add = async () => {
+      try {
+        const res = await fetch(`/api/client-lists/${listId}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to add client to list");
+        }
+        setMembership((prev) => ({
+          ...prev,
+          [listId]: [...(prev[listId] || []), clientId],
+        }));
+        toast.success(`${clientName} added to list`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to add client to list");
+      }
+    };
+
+    void add();
   };
 
   const removeClientFromList = (listId: string, clientId: string, clientName: string) => {
-    setMembership((prev) => ({
-      ...prev,
-      [listId]: (prev[listId] || []).filter((id) => id !== clientId),
-    }));
-    toast.success(`${clientName} removed from list`);
+    const remove = async () => {
+      try {
+        const res = await fetch(
+          `/api/client-lists/${listId}/members?clientId=${encodeURIComponent(
+            clientId
+          )}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to remove client from list");
+        }
+        setMembership((prev) => ({
+          ...prev,
+          [listId]: (prev[listId] || []).filter((id) => id !== clientId),
+        }));
+        toast.success(`${clientName} removed from list`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to remove client from list");
+      }
+    };
+
+    void remove();
   };
 
   return (
@@ -136,6 +321,14 @@ export function ClientListsPage() {
       </div>
 
       {/* Grid of lists */}
+      {loading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          <span className="text-sm text-muted-foreground">
+            Loading client lists...
+          </span>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {lists.map((list) => {
           const memberCount = (membership[list.id] || []).length;
@@ -182,7 +375,7 @@ export function ClientListsPage() {
                     variant="outline"
                     size="sm"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(list.id, list.name)}
+                    onClick={() => setDeleteTarget(list)}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -192,6 +385,7 @@ export function ClientListsPage() {
           );
         })}
       </div>
+      )}
 
       {/* Create List Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -429,6 +623,39 @@ export function ClientListsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete List Confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete list {deleteTarget?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this client list. Clients will remain in your database, but they will no longer be grouped in this list. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) {
+                  handleDelete(deleteTarget.id, deleteTarget.name);
+                }
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -101,11 +101,11 @@ const defaultOutbound: OutboundConfig = {
   voiceId: "alloy",
   language: "en-US",
   systemPrompt: "",
-  greeting: "Hi, this is a call from VoiceEstate regarding a property you may be interested in.",
+  greeting: "Hi, this is a call from Convaire regarding a property you may be interested in.",
   maxDurationSec: 180,
   recordCalls: true,
   transcribeEnabled: true,
-  callerIdName: "VoiceEstate",
+  callerIdName: "Convaire",
   retryOnNoAnswer: true,
   retryAttempts: 2,
   timeBetweenRetriesSec: 3600,
@@ -340,22 +340,20 @@ function PricingSection() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setCalcDirection("inbound")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm transition-colors ${
-                    calcDirection === "inbound"
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm transition-colors ${calcDirection === "inbound"
                       ? "border-teal-300 bg-teal-50 text-teal-700"
                       : "border-border hover:bg-accent"
-                  }`}
+                    }`}
                 >
                   <PhoneIncoming className="w-3.5 h-3.5" />
                   Inbound
                 </button>
                 <button
                   onClick={() => setCalcDirection("outbound")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm transition-colors ${
-                    calcDirection === "outbound"
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm transition-colors ${calcDirection === "outbound"
                       ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                       : "border-border hover:bg-accent"
-                  }`}
+                    }`}
                 >
                   <PhoneOutgoing className="w-3.5 h-3.5" />
                   Outbound

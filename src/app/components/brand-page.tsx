@@ -105,7 +105,7 @@ export function BrandPage() {
                   <div className="w-12 h-12 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center shadow-lg shadow-[#1a8ee9]/20">
                     <Headphones className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-2xl text-[#0f172a]" style={{ fontWeight: 700 }}>VoiceEstate</span>
+                  <span className="text-2xl text-[#0f172a]" style={{ fontWeight: 700 }}>Convaire</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">Use on light backgrounds</p>
               </CardContent>
@@ -118,7 +118,7 @@ export function BrandPage() {
                   <div className="w-12 h-12 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center">
                     <Headphones className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-2xl text-white" style={{ fontWeight: 700 }}>VoiceEstate</span>
+                  <span className="text-2xl text-white" style={{ fontWeight: 700 }}>Convaire</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">Use on dark backgrounds</p>
               </CardContent>

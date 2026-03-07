@@ -17,6 +17,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { Logo } from "./ui/logo";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -36,25 +37,13 @@ export function SidebarNav() {
 
   return (
     <aside
-      className={`bg-sidebar flex flex-col h-full transition-all duration-300 shrink-0 ${
-        collapsed ? "w-[68px]" : "w-[260px]"
-      }`}
+      className={`bg-sidebar flex flex-col h-full transition-all duration-300 shrink-0 ${collapsed ? "w-[68px]" : "w-[260px]"
+        }`}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
         <NavLink to="/home" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center shrink-0 shadow-lg shadow-[#1a8ee9]/20">
-            <Headphones className="w-4.5 h-4.5 text-white" />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h3 className="truncate leading-tight text-white">VoiceEstate</h3>
-              <p className="text-sidebar-foreground/50 text-xs truncate flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5" />
-                AI Calling Platform
-              </p>
-            </div>
-          )}
+          <Logo isCollapsed={collapsed} />
         </NavLink>
       </div>
 
@@ -71,10 +60,9 @@ export function SidebarNav() {
             to={item.to}
             end={item.to === "/dashboard"}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-[5px] transition-all duration-200 text-sm ${
-                isActive
-                  ? "bg-[#1a8ee9] text-white shadow-md shadow-[#1a8ee9]/25"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-white"
+              `flex items-center gap-3 px-3 py-2.5 rounded-[5px] transition-all duration-200 text-sm ${isActive
+                ? "bg-[#1a8ee9] text-white shadow-md shadow-[#1a8ee9]/25"
+                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-white"
               } ${collapsed ? "justify-center" : ""}`
             }
           >

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -10,9 +10,9 @@ import {
 } from "./ui/dialog";
 import {
   Target, Search, Download, UserPlus, Eye, Flame, Thermometer, Snowflake,
-  Phone, Megaphone, Calendar, FileText,
+  Phone, Megaphone, Calendar, FileText, Loader2,
 } from "lucide-react";
-import { leads } from "./mock-data";
+import { useAuth } from "../auth";
 import { toast } from "sonner";
 
 const interestStyles: Record<string, string> = {
@@ -34,14 +34,70 @@ const interestIcon = (level: string) => {
   return <Snowflake className="w-3 h-3" />;
 };
 
+type LeadInterest = "hot" | "warm" | "cold";
+type LeadStatus = "new" | "follow-up" | "converted" | "dead";
+
+type LeadType = {
+  id: string;
+  name: string;
+  phone: string;
+  campaign: string;
+  project?: string;
+  interest: LeadInterest;
+  status: LeadStatus;
+  assignedTo: string;
+  date: string;
+  notes?: string;
+};
+
 export function LeadsPage() {
+  const { user } = useAuth();
+  const [leadsList, setLeadsList] = useState<LeadType[]>([]);
+  const [loading, setLoading] = useState(false);
   const [interestFilter, setInterestFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewOpen, setViewOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<typeof leads[0] | null>(null);
+  const [selectedLead, setSelectedLead] = useState<LeadType | null>(null);
 
-  const filtered = leads.filter((l) => {
-    const name = (l as any).clientName || (l as any).name || "";
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) return;
+      setLoading(true);
+      try {
+        const res = await fetch("/api/leads", {
+          headers: { "x-user-email": user.email },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load leads");
+        }
+        const json = await res.json();
+        const items: LeadType[] = (json.leads ?? []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          campaign: l.campaign ?? "",
+          project: l.project ?? "",
+          interest: l.interest as LeadInterest,
+          status: (l.status === "follow_up" ? "follow-up" : l.status) as LeadStatus,
+          assignedTo: l.assignedTo ?? "Unassigned",
+          date: l.date,
+          notes: l.notes ?? "",
+        }));
+        setLeadsList(items);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to load leads");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [user?.email]);
+
+  const filtered = leadsList.filter((l) => {
+    const name = l.name || "";
     const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesInterest = interestFilter === "all" || l.interest === interestFilter;
     return matchesSearch && matchesInterest;
@@ -49,22 +105,22 @@ export function LeadsPage() {
 
   const handleExport = () => {
     const headers = ["Client", "Phone", "Campaign", "Project", "Interest", "Status", "Assigned To", "Date", "Notes"];
-    const rows = leads.map((l) => {
-      const name = (l as any).clientName || (l as any).name || "";
-      return [name, l.phone, l.campaign, (l as any).project || "", l.interest, l.status, l.assignedTo, l.date, (l as any).notes || ""];
+    const rows = leadsList.map((l) => {
+      const name = l.name || "";
+      return [name, l.phone, l.campaign, l.project || "", l.interest, l.status, l.assignedTo, l.date, l.notes || ""];
     });
     const csvContent = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "voiceestate-leads.csv";
+    a.download = "convaire-leads.csv";
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${leads.length} leads to CSV`);
+    toast.success(`Exported ${leadsList.length} leads to CSV`);
   };
 
-  const openView = (lead: typeof leads[0]) => {
+  const openView = (lead: LeadType) => {
     setSelectedLead(lead);
     setViewOpen(true);
   };
@@ -92,7 +148,7 @@ export function LeadsPage() {
               <Target className="w-4 h-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Total Leads</p>
             </div>
-            <p className="text-2xl mt-1">{leads.length}</p>
+            <p className="text-2xl mt-1">{leadsList.length}</p>
           </CardContent>
         </Card>
         <Card className="gap-3">
@@ -102,7 +158,7 @@ export function LeadsPage() {
               <p className="text-xs text-muted-foreground">Hot</p>
             </div>
             <p className="text-2xl mt-1 text-red-500">
-              {leads.filter((l) => l.interest === "hot").length}
+              {leadsList.filter((l) => l.interest === "hot").length}
             </p>
           </CardContent>
         </Card>
@@ -113,7 +169,7 @@ export function LeadsPage() {
               <p className="text-xs text-muted-foreground">Warm</p>
             </div>
             <p className="text-2xl mt-1 text-amber-500">
-              {leads.filter((l) => l.interest === "warm").length}
+              {leadsList.filter((l) => l.interest === "warm").length}
             </p>
           </CardContent>
         </Card>
@@ -124,7 +180,7 @@ export function LeadsPage() {
               <p className="text-xs text-muted-foreground">Cold</p>
             </div>
             <p className="text-2xl mt-1 text-blue-500">
-              {leads.filter((l) => l.interest === "cold").length}
+              {leadsList.filter((l) => l.interest === "cold").length}
             </p>
           </CardContent>
         </Card>
@@ -161,72 +217,81 @@ export function LeadsPage() {
       {/* Table */}
       <Card>
         <CardContent className="pt-0 px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead className="hidden md:table-cell">Campaign</TableHead>
-                <TableHead>Interest</TableHead>
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="hidden lg:table-cell">Assigned To</TableHead>
-                <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((lead) => {
-                const name = (lead as any).clientName || (lead as any).name || "";
-                return (
-                  <TableRow key={lead.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs">
-                          {name.split(" ").map((n: string) => n[0]).join("")}
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              <span className="text-sm text-muted-foreground">
+                Loading leads...
+              </span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead className="hidden md:table-cell">Campaign</TableHead>
+                  <TableHead>Interest</TableHead>
+                  <TableHead className="hidden sm:table-cell">Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">Assigned To</TableHead>
+                  <TableHead className="hidden md:table-cell">Date</TableHead>
+                  <TableHead className="w-10"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((lead) => {
+                  const name = lead.name || "";
+                  return (
+                    <TableRow key={lead.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs">
+                            {name.split(" ").map((n: string) => n[0]).join("")}
+                          </div>
+                          <div>
+                            <p className="text-sm">{name}</p>
+                            <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm">{name}</p>
-                          <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {lead.campaign}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={interestStyles[lead.interest]}>
+                          <span className="flex items-center gap-1">
+                            {interestIcon(lead.interest)}
+                            {lead.interest}
+                          </span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge className={statusStyles[lead.status]}>
+                          {lead.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <UserPlus className="w-3 h-3" />
+                          {lead.assignedTo}
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {lead.campaign}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={interestStyles[lead.interest]}>
-                        <span className="flex items-center gap-1">
-                          {interestIcon(lead.interest)}
-                          {lead.interest}
-                        </span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge className={statusStyles[lead.status]}>
-                        {lead.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <UserPlus className="w-3 h-3" />
-                        {lead.assignedTo}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {lead.date}
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        className="p-1.5 rounded-md hover:bg-accent"
-                        onClick={() => openView(lead)}
-                      >
-                        <Eye className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {lead.date}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          className="p-1.5 rounded-md hover:bg-accent"
+                          onClick={() => openView(lead)}
+                        >
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -241,7 +306,7 @@ export function LeadsPage() {
             <DialogDescription>View lead information, interest level, and notes.</DialogDescription>
           </DialogHeader>
           {selectedLead && (() => {
-            const name = (selectedLead as any).clientName || (selectedLead as any).name || "";
+            const name = selectedLead.name || "";
             return (
               <div className="space-y-4 py-2">
                 <div className="flex items-center gap-4">
@@ -282,7 +347,7 @@ export function LeadsPage() {
                       <Target className="w-3 h-3" />
                       Project
                     </div>
-                    <p className="text-sm mt-0.5">{(selectedLead as any).project || "N/A"}</p>
+                    <p className="text-sm mt-0.5">{selectedLead.project || "N/A"}</p>
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -300,14 +365,14 @@ export function LeadsPage() {
                   </div>
                 </div>
 
-                {(selectedLead as any).notes && (
+                {selectedLead.notes && (
                   <div className="border-t border-border pt-4">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                       <FileText className="w-3 h-3" />
                       Notes
                     </div>
                     <div className="bg-accent/50 rounded-lg p-3 text-sm">
-                      {(selectedLead as any).notes}
+                      {selectedLead.notes}
                     </div>
                   </div>
                 )}

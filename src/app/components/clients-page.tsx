@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -8,6 +8,16 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "./ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub,
@@ -21,12 +31,23 @@ import {
 } from "./ui/select";
 import {
   Users, Plus, Upload, Download, Search, MoreHorizontal, Phone, MapPin,
-  FileUp, Eye, Pencil, Trash2, ListChecks, Ban, CheckCircle2, UserX,
+  FileUp, Eye, Pencil, Trash2, ListChecks, Ban, CheckCircle2, UserX, Loader2,
 } from "lucide-react";
-import { clients as initialClients, clientListMembers as initialMembership } from "./mock-data";
+import { useAuth } from "../auth";
 import { toast } from "sonner";
 
-type ClientType = typeof initialClients[0];
+type ClientStatus = "active" | "inactive" | "do_not_call";
+
+type ClientType = {
+  id: string;
+  name: string;
+  phone: string;
+  location: string;
+  tags: string[];
+  status: ClientStatus;
+  source: string;
+  createdAt: string;
+};
 
 const statusStyles: Record<string, string> = {
   active: "bg-green-100 text-green-700 border-green-200",
@@ -34,25 +55,25 @@ const statusStyles: Record<string, string> = {
   do_not_call: "bg-red-100 text-red-700 border-red-200",
 };
 
-const clientLists = [
-  { id: "1", name: "Islamabad Investors" },
-  { id: "2", name: "DHA Lahore Leads" },
-  { id: "3", name: "Karachi High Net Worth" },
-  { id: "4", name: "Rawalpindi End Users" },
-  { id: "5", name: "Overseas Pakistanis" },
-  { id: "6", name: "Bahria Town Interested" },
-];
+type ClientList = {
+  id: string;
+  name: string;
+};
 
 export function ClientsPage() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [clientsList, setClientsList] = useState(initialClients);
-  const [membership, setMembership] = useState(initialMembership);
+  const [clientsList, setClientsList] = useState<ClientType[]>([]);
+  const [membership, setMembership] = useState<Record<string, string[]>>({});
+  const [clientLists, setClientLists] = useState<ClientList[]>([]);
+  const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
+  const [deleteClient, setDeleteClient] = useState<ClientType | null>(null);
 
   // Add client form state
   const [newClient, setNewClient] = useState({
@@ -63,6 +84,67 @@ export function ClientsPage() {
   const [editClient, setEditClient] = useState({
     name: "", phone: "", location: "", tags: "", status: "active", source: "Manual",
   });
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) return;
+      setLoading(true);
+      try {
+        const [clientsRes, listsRes] = await Promise.all([
+          fetch("/api/clients", {
+            headers: { "x-user-email": user.email },
+          }),
+          fetch("/api/client-lists", {
+            headers: { "x-user-email": user.email },
+          }),
+        ]);
+
+        if (!clientsRes.ok) {
+          throw new Error("Failed to load clients");
+        }
+        if (!listsRes.ok) {
+          throw new Error("Failed to load client lists");
+        }
+
+        const clientsJson = await clientsRes.json();
+        const listsJson = await listsRes.json();
+
+        const mappedClients: ClientType[] = (clientsJson.clients ?? []).map(
+          (c: any) => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone,
+            location: c.location ?? "N/A",
+            tags: c.tags ? String(c.tags).split(",").map((t: string) => t.trim()).filter(Boolean) : [],
+            status: c.status as ClientStatus,
+            source: c.source ?? "Manual",
+            createdAt: c.createdAt?.split("T")[0] ?? "",
+          })
+        );
+
+        setClientsList(mappedClients);
+
+        const lists: ClientList[] = (listsJson.lists ?? []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+        }));
+        setClientLists(lists);
+
+        const membershipMap: Record<string, string[]> = {};
+        for (const l of listsJson.lists ?? []) {
+          membershipMap[l.id] = l.memberIds ?? [];
+        }
+        setMembership(membershipMap);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load clients from server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [user?.email]);
 
   const filtered = clientsList.filter((c) => {
     const matchesSearch =
@@ -87,10 +169,65 @@ export function ClientsPage() {
       source: newClient.source,
       createdAt: new Date().toISOString().split("T")[0],
     };
-    setClientsList((prev) => [client, ...prev]);
-    setNewClient({ name: "", phone: "", location: "", tags: "", status: "active", source: "Manual", notes: "" });
-    setAddOpen(false);
-    toast.success(`Client "${client.name}" added successfully`);
+    const doCreate = async () => {
+      if (!user?.email) return;
+      try {
+        const res = await fetch("/api/clients", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": user.email,
+          },
+          body: JSON.stringify({
+            name: newClient.name,
+            phone: newClient.phone,
+            location: newClient.location,
+            tags: newClient.tags,
+            status: newClient.status,
+            source: newClient.source,
+            notes: newClient.notes,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to create client");
+        }
+
+        const data = await res.json();
+        const created = data.client;
+        const mapped: ClientType = {
+          id: created.id,
+          name: created.name, // Keeping 'name' as per ClientType
+          phone: created.phone,
+          location: created.location ?? "N/A",
+          tags: created.tags
+            ? String(created.tags).split(",").map((t: string) => t.trim()).filter(Boolean)
+            : [],
+          status: created.status as ClientStatus, // Keeping 'status' as per ClientType
+          source: created.source ?? "Manual",
+          createdAt: created.createdAt?.split("T")[0] ?? "",
+        };
+
+        setClientsList((prev) => [mapped, ...prev]);
+        setNewClient({
+          name: "",
+          phone: "",
+          location: "",
+          tags: "",
+          status: "active",
+          source: "Manual",
+          notes: "",
+        });
+        setAddOpen(false);
+        toast.success(`Client "${mapped.name}" added successfully`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to create client");
+      }
+    };
+
+    void doCreate();
   };
 
   const handleEditClient = () => {
@@ -98,23 +235,60 @@ export function ClientsPage() {
       toast.error("Name and Phone are required");
       return;
     }
-    setClientsList((prev) =>
-      prev.map((c) =>
-        c.id === selectedClient.id
-          ? {
-              ...c,
-              name: editClient.name,
-              phone: editClient.phone,
-              location: editClient.location,
-              tags: editClient.tags ? editClient.tags.split(",").map((t) => t.trim()) : [],
-              status: editClient.status as "active" | "inactive" | "do_not_call",
-              source: editClient.source,
-            }
-          : c
-      )
-    );
-    setEditOpen(false);
-    toast.success(`Client "${editClient.name}" updated`);
+    const doUpdate = async () => {
+      try {
+        const res = await fetch(`/api/clients/${selectedClient.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: editClient.name,
+            phone: editClient.phone,
+            location: editClient.location,
+            tags: editClient.tags,
+            status: editClient.status,
+            source: editClient.source,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to update client");
+        }
+
+        const data = await res.json();
+        const updated = data.client;
+
+        setClientsList((prev) =>
+          prev.map((c) =>
+            c.id === selectedClient.id
+              ? {
+                ...c,
+                name: updated.name,
+                phone: updated.phone,
+                location: updated.location ?? "N/A",
+                tags: updated.tags
+                  ? String(updated.tags)
+                    .split(",")
+                    .map((t: string) => t.trim())
+                    .filter(Boolean)
+                  : [],
+                status: updated.status as ClientStatus,
+                source: updated.source ?? "Manual",
+              }
+              : c
+          )
+        );
+        setEditOpen(false);
+        toast.success(`Client "${updated.name}" updated`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to update client");
+      }
+    };
+
+    void doUpdate();
   };
 
   const openView = (client: ClientType) => {
@@ -136,17 +310,53 @@ export function ClientsPage() {
   };
 
   const handleDelete = (client: ClientType) => {
-    setClientsList((prev) => prev.filter((c) => c.id !== client.id));
-    toast.success(`Client "${client.name}" deleted`);
+    const doDelete = async () => {
+      try {
+        const res = await fetch(`/api/clients/${client.id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to delete client");
+        }
+        setClientsList((prev) => prev.filter((c) => c.id !== client.id));
+        toast.success(`Client "${client.name}" deleted`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to delete client");
+      }
+    };
+
+    void doDelete();
   };
 
   const changeStatus = (client: ClientType, newStatus: string) => {
-    setClientsList((prev) =>
-      prev.map((c) =>
-        c.id === client.id ? { ...c, status: newStatus as any } : c
-      )
-    );
-    toast.success(`${client.name} status changed to ${newStatus.replace("_", " ")}`);
+    const doChange = async () => {
+      try {
+        const res = await fetch(`/api/clients/${client.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to update status");
+        }
+        setClientsList((prev) =>
+          prev.map((c) =>
+            c.id === client.id ? { ...c, status: newStatus as ClientStatus } : c
+          )
+        );
+        toast.success(
+          `${client.name} status changed to ${newStatus.replace("_", " ")}`
+        );
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to update status");
+      }
+    };
+
+    void doChange();
   };
 
   const addToList = (client: ClientType, listId: string, listName: string) => {
@@ -156,9 +366,35 @@ export function ClientsPage() {
         toast.info(`${client.name} is already in "${listName}"`);
         return prev;
       }
-      toast.success(`${client.name} added to "${listName}"`);
-      return { ...prev, [listId]: [...current, client.id] };
+      return prev;
     });
+
+    const doAdd = async () => {
+      try {
+        const res = await fetch(`/api/client-lists/${listId}/members`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ clientId: client.id }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to add to list");
+        }
+        setMembership((prev) => {
+          const current = prev[listId] || [];
+          if (current.includes(client.id)) return prev;
+          return { ...prev, [listId]: [...current, client.id] };
+        });
+        toast.success(`${client.name} added to "${listName}"`);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to add to list");
+      }
+    };
+
+    void doAdd();
   };
 
   const getClientLists = (clientId: string) => {
@@ -175,7 +411,7 @@ export function ClientsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "voiceestate-clients.csv";
+    a.download = "convaire-clients.csv";
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${clientsList.length} clients to CSV`);
@@ -281,153 +517,162 @@ export function ClientsPage() {
       {/* Table */}
       <Card>
         <CardContent className="pt-0 px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="hidden md:table-cell">Location</TableHead>
-                <TableHead className="hidden lg:table-cell">Tags</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Source</TableHead>
-                <TableHead className="hidden lg:table-cell">Created</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((client) => (
-                <TableRow key={client.id} className="cursor-pointer">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs text-accent-foreground">
-                        {client.name.split(" ").map(n => n[0]).join("")}
-                      </div>
-                      <span className="text-sm">{client.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Phone className="w-3 h-3" />
-                      {client.phone}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <MapPin className="w-3 h-3" />
-                      {client.location}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex gap-1 flex-wrap">
-                      {client.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={statusStyles[client.status]}>
-                      {client.status.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {client.source}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {client.createdAt}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="p-1 rounded hover:bg-accent">
-                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        <DropdownMenuLabel className="text-xs">{client.name}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem onClick={() => openView(client)}>
-                            <Eye className="w-4 h-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEdit(client)}>
-                            <Pencil className="w-4 h-4" />
-                            Edit Client
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-
-                        {/* Add to List submenu */}
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <ListChecks className="w-4 h-4" />
-                            Add to List
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {clientLists.map((list) => {
-                              const isInList = (membership[list.id] || []).includes(client.id);
-                              return (
-                                <DropdownMenuItem
-                                  key={list.id}
-                                  onClick={() => addToList(client, list.id, list.name)}
-                                  disabled={isInList}
-                                >
-                                  {isInList && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                                  <span className={isInList ? "text-muted-foreground" : ""}>{list.name}</span>
-                                </DropdownMenuItem>
-                              );
-                            })}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-
-                        {/* Change Status submenu */}
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Change Status
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            <DropdownMenuItem
-                              onClick={() => changeStatus(client, "active")}
-                              disabled={client.status === "active"}
-                            >
-                              <CheckCircle2 className="w-3 h-3 text-green-500" />
-                              Active
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => changeStatus(client, "inactive")}
-                              disabled={client.status === "inactive"}
-                            >
-                              <UserX className="w-3 h-3 text-gray-500" />
-                              Inactive
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => changeStatus(client, "do_not_call")}
-                              disabled={client.status === "do_not_call"}
-                            >
-                              <Ban className="w-3 h-3 text-red-500" />
-                              Do Not Call
-                            </DropdownMenuItem>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => handleDelete(client)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete Client
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              <span className="text-sm text-muted-foreground">
+                Loading clients...
+              </span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead className="hidden md:table-cell">Location</TableHead>
+                  <TableHead className="hidden lg:table-cell">Tags</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden md:table-cell">Source</TableHead>
+                  <TableHead className="hidden lg:table-cell">Created</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((client) => (
+                  <TableRow key={client.id} className="cursor-pointer">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs text-accent-foreground">
+                          {client.name.split(" ").map(n => n[0]).join("")}
+                        </div>
+                        <span className="text-sm">{client.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Phone className="w-3 h-3" />
+                        {client.phone}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MapPin className="w-3 h-3" />
+                        {client.location}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex gap-1 flex-wrap">
+                        {client.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={statusStyles[client.status]}>
+                        {client.status.replace("_", " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {client.source}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                      {client.createdAt}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1 rounded hover:bg-accent">
+                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuLabel className="text-xs">{client.name}</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem onClick={() => openView(client)}>
+                              <Eye className="w-4 h-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEdit(client)}>
+                              <Pencil className="w-4 h-4" />
+                              Edit Client
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+
+                          {/* Add to List submenu */}
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <ListChecks className="w-4 h-4" />
+                              Add to List
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {clientLists.map((list) => {
+                                const isInList = (membership[list.id] || []).includes(client.id);
+                                return (
+                                  <DropdownMenuItem
+                                    key={list.id}
+                                    onClick={() => addToList(client, list.id, list.name)}
+                                    disabled={isInList}
+                                  >
+                                    {isInList && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                                    <span className={isInList ? "text-muted-foreground" : ""}>{list.name}</span>
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+
+                          {/* Change Status submenu */}
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <CheckCircle2 className="w-4 h-4" />
+                              Change Status
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuItem
+                                onClick={() => changeStatus(client, "active")}
+                                disabled={client.status === "active"}
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                Active
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => changeStatus(client, "inactive")}
+                                disabled={client.status === "inactive"}
+                              >
+                                <UserX className="w-3 h-3 text-gray-500" />
+                                Inactive
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => changeStatus(client, "do_not_call")}
+                                disabled={client.status === "do_not_call"}
+                              >
+                                <Ban className="w-3 h-3 text-red-500" />
+                                Do Not Call
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteClient(client)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete Client
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -587,10 +832,42 @@ export function ClientsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditClient}>Save Changes</Button>
+            <Button onClick={handleEditClient}>Update Client</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Client Confirmation */}
+      <AlertDialog open={!!deleteClient} onOpenChange={(open) => !open && setDeleteClient(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete client {deleteClient?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this client from your database and from all client lists. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setDeleteClient(null)}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteClient) {
+                  handleDelete(deleteClient);
+                }
+                setDeleteClient(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add Client Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

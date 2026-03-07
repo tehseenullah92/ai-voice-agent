@@ -97,7 +97,7 @@ const categories = [
 
 const popularArticles = [
   {
-    title: "Getting Started with VoiceEstate",
+    title: "Getting Started with Convaire",
     category: "Onboarding",
     readTime: "5 min",
     views: 2340,
@@ -160,12 +160,12 @@ const faqs = [
     a: "When you reach 90% of your call limit, we'll notify you via email and in-app. Once the limit is reached, campaigns will pause automatically. You can upgrade your plan or purchase additional call credits from the Billing page.",
   },
   {
-    q: "How do I integrate VoiceEstate with my existing CRM?",
+    q: "How do I integrate Convaire with my existing CRM?",
     a: "We offer native integrations with Salesforce, HubSpot, Zoho, and Pipedrive. Go to Settings > Integrations, select your CRM, and follow the authorization flow. For custom CRMs, use our REST API with webhook support.",
   },
   {
     q: "Is my data secure and compliant?",
-    a: "VoiceEstate is SOC 2 Type II certified, GDPR compliant, and uses AES-256 encryption at rest and TLS 1.3 in transit. All call recordings are encrypted, and we offer data residency options for enterprise customers.",
+    a: "Convaire is SOC 2 Type II certified, GDPR compliant, and uses AES-256 encryption at rest and TLS 1.3 in transit. All call recordings are encrypted, and we offer data residency options for enterprise customers.",
   },
 ];
 
@@ -271,18 +271,18 @@ export function HelpSupportPage() {
 
   const filteredArticles = searchQuery
     ? popularArticles.filter(
-        (a) =>
-          a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.category.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      (a) =>
+        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.category.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : popularArticles;
 
   const filteredFaqs = searchQuery
     ? faqs.filter(
-        (f) =>
-          f.q.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          f.a.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      (f) =>
+        f.q.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        f.a.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : faqs;
 
   const handleContactSubmit = (e: React.FormEvent) => {
@@ -542,9 +542,8 @@ export function HelpSupportPage() {
                     {faq.q}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 text-[#94a3b8] shrink-0 transition-transform duration-200 ${
-                      openFaq === i ? "rotate-180" : ""
-                    }`}
+                    className={`w-4 h-4 text-[#94a3b8] shrink-0 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
                 <div
@@ -645,17 +644,15 @@ export function HelpSupportPage() {
                         {ticket.id}
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full ${
-                          statusColors[ticket.status].bg
-                        } ${statusColors[ticket.status].text}`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${statusColors[ticket.status].bg
+                          } ${statusColors[ticket.status].text}`}
                         style={{ fontWeight: 500 }}
                       >
                         {statusColors[ticket.status].label}
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full ${
-                          priorityColors[ticket.priority].bg
-                        } ${priorityColors[ticket.priority].text}`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${priorityColors[ticket.priority].bg
+                          } ${priorityColors[ticket.priority].text}`}
                         style={{ fontWeight: 500 }}
                       >
                         {ticket.priority}
@@ -707,7 +704,7 @@ export function HelpSupportPage() {
                 {
                   icon: Mail,
                   title: "Email Support",
-                  desc: "support@voiceestate.com",
+                  desc: "support@convaire.com",
                   detail: "Avg. response: 4 hours",
                   color: "#1a8ee9",
                   available: true,
@@ -731,11 +728,10 @@ export function HelpSupportPage() {
               ].map((method, i) => (
                 <div
                   key={i}
-                  className={`p-4 rounded-[5px] border bg-white transition-all ${
-                    method.available
+                  className={`p-4 rounded-[5px] border bg-white transition-all ${method.available
                       ? "border-[#e2e8f0] hover:shadow-md hover:border-[#1a8ee9]/20 cursor-pointer"
                       : "border-[#e2e8f0] opacity-60"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div

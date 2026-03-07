@@ -1,5 +1,6 @@
 import { Headphones, Phone, Bot, BarChart3, Shield, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router";
+import { Logo } from "./ui/logo";
 
 const features = [
   { icon: Bot, text: "AI Voice Agents that call, qualify & book leads 24/7" },
@@ -25,12 +26,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             onClick={() => navigate("/home")}
             className="flex items-center gap-2.5 mb-16"
           >
-            <div className="w-9 h-9 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center">
-              <Headphones className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl text-white" style={{ fontWeight: 600 }}>
-              VoiceEstate
-            </span>
+            <Logo />
           </button>
 
           {/* Tagline */}
@@ -43,7 +39,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             for Real Estate
           </h1>
           <p className="text-[#94a3b8] text-sm leading-relaxed mb-10 max-w-sm">
-            Join 340+ agencies using VoiceEstate to automate outreach, qualify
+            Join 340+ agencies using Convaire to automate outreach, qualify
             leads, and book site visits with AI voice agents.
           </p>
 
@@ -93,15 +89,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
               onClick={() => navigate("/home")}
               className="flex items-center gap-2.5"
             >
-              <div className="w-8 h-8 rounded-[5px] bg-[#1a8ee9] flex items-center justify-center">
-                <Headphones className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span
-                className="text-lg text-[#0f172a]"
-                style={{ fontWeight: 600 }}
-              >
-                VoiceEstate
-              </span>
+              <Logo dark={true} />
             </button>
           </div>
 
