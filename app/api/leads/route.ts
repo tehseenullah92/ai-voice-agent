@@ -10,8 +10,14 @@ export async function GET(req: NextRequest) {
     const user = await getOrCreateAuthenticatedUser(req);
     if (!user) return unauthorizedJsonResponse();
 
+    const { searchParams } = new URL(req.url);
+    const campaignId = searchParams.get("campaignId");
+
     const leads = await prisma.lead.findMany({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        ...(campaignId ? { campaignId } : {}),
+      },
       orderBy: { date: "desc" },
     });
 

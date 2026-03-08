@@ -4,6 +4,61 @@ import {
   getOrCreateAuthenticatedUser,
   unauthorizedJsonResponse,
 } from "../../../../lib/server-auth";
+import { autoPopulateCalls } from "../../../../lib/campaign-populate";
+
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getOrCreateAuthenticatedUser(_req);
+    if (!user) return unauthorizedJsonResponse();
+
+    const { id } = await ctx.params;
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, userId: user.id },
+      include: {
+        listLinks: {
+          include: { clientList: true },
+        },
+      },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
+    let clientListName: string | null =
+      campaign.listLinks[0]?.clientList?.name ?? null;
+    if (!clientListName && campaign.clientListKey) {
+      const list = await prisma.clientList.findFirst({
+        where: { id: campaign.clientListKey, userId: user.id },
+      });
+      clientListName = list?.name ?? null;
+    }
+
+    const shaped = {
+      id: campaign.id,
+      name: campaign.name,
+      project: campaign.project,
+      language: campaign.language,
+      concurrency: campaign.concurrency,
+      totalClients: campaign.totalClients,
+      called: campaign.called,
+      remaining: campaign.remaining,
+      interested: campaign.interested,
+      status: campaign.status,
+      createdAt: campaign.createdAt.toISOString().split("T")[0],
+      clientListKey: campaign.clientListKey,
+      clientListName,
+    };
+
+    return NextResponse.json({ campaign: shaped });
+  } catch (err) {
+    console.error("GET /api/campaigns/[id] error", err);
+    return NextResponse.json({ error: "Failed to load campaign" }, { status: 500 });
+  }
+}
 
 export async function PUT(
   req: NextRequest,
@@ -37,6 +92,11 @@ export async function PUT(
 
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
+    const clientListId = typeof clientList === "string" && clientList.length > 0 ? clientList : null;
+    if (clientListId) {
+      await autoPopulateCalls(prisma, id, user.id);
     }
 
     const updated = await prisma.campaign.findFirst({ where: { id, userId: user.id } });

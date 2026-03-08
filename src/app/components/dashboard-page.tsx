@@ -2,8 +2,6 @@ import {
   Users,
   Megaphone,
   PhoneCall,
-  Target,
-  CalendarCheck,
   TrendingUp,
   Clock,
   ArrowUpRight,
@@ -12,26 +10,17 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
   AreaChart,
   Area,
 } from "recharts";
 import {
   dashboardStats,
   callsPerDay,
-  callOutcomes,
-  recentLeads,
-  leadsOverTime,
   campaigns,
 } from "./mock-data";
 import { Progress } from "./ui/progress";
@@ -65,24 +54,6 @@ const statCards = [
     borderColor: "border-emerald-200",
   },
   {
-    label: "Leads This Week",
-    value: dashboardStats.leadsThisWeek,
-    icon: Target,
-    change: "+12",
-    trend: "up" as const,
-    color: "bg-orange-500/10 text-orange-600",
-    borderColor: "border-orange-200",
-  },
-  {
-    label: "Appointments",
-    value: dashboardStats.appointmentsThisWeek,
-    icon: CalendarCheck,
-    change: "-3",
-    trend: "down" as const,
-    color: "bg-pink-500/10 text-pink-600",
-    borderColor: "border-pink-200",
-  },
-  {
     label: "Conversion Rate",
     value: `${dashboardStats.conversionRate}%`,
     icon: TrendingUp,
@@ -92,15 +63,6 @@ const statCards = [
     borderColor: "border-[#0b5b9a]/20",
   },
 ];
-
-const interestBadge = (level: "hot" | "warm" | "cold") => {
-  const styles = {
-    hot: "bg-red-100 text-red-700 border-red-200",
-    warm: "bg-amber-100 text-amber-700 border-amber-200",
-    cold: "bg-[#1a8ee9]/10 text-[#1a8ee9] border-[#1a8ee9]/20",
-  };
-  return styles[level];
-};
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -124,7 +86,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3 lg:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 lg:gap-4">
         {statCards.map((stat) => (
           <Card key={stat.label} className="gap-4 hover:shadow-md transition-shadow duration-200">
             <CardContent className="pt-5">
@@ -151,9 +113,9 @@ export function DashboardPage() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Calls Per Day */}
-        <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
+        <Card className="hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-[#1a8ee9]/10">
@@ -191,96 +153,12 @@ export function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Call Outcomes */}
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-[#1a8ee9]/10">
-                <Target className="w-4 h-4 text-[#1a8ee9]" />
-              </div>
-              Call Outcomes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[280px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={callOutcomes}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {callOutcomes.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "12px",
-                      fontSize: 12,
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    }}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 11 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Leads Over Time + Active Campaigns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Leads trend */}
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-[#1a8ee9]/10">
-                <TrendingUp className="w-4 h-4 text-[#1a8ee9]" />
-              </div>
-              Leads by Interest (Last 7 Days)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={leadsOverTime}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "12px",
-                      fontSize: 12,
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    }}
-                  />
-                  <Bar dataKey="hot" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="warm" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="cold" stackId="a" fill="#1a8ee9" radius={[4, 4, 0, 0]} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Active Campaigns + Quick Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Active Campaigns */}
-        <Card className="hover:shadow-md transition-shadow duration-200">
+        <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-purple-500/10">
@@ -323,48 +201,6 @@ export function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Recent Leads + Quick Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-orange-500/10">
-                <Target className="w-4 h-4 text-orange-600" />
-              </div>
-              Recent Leads
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentLeads.map((lead) => (
-                <div
-                  key={lead.id}
-                  className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-muted/40 transition-colors border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-[5px] bg-[#1a8ee9]/15 flex items-center justify-center text-sm text-[#1a8ee9]">
-                      {lead.name[0]}
-                    </div>
-                    <div>
-                      <p className="text-sm">{lead.name}</p>
-                      <p className="text-xs text-muted-foreground">{lead.campaign}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={interestBadge(lead.interest)}>
-                      {lead.interest}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
-                      {lead.date}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Quick Stats */}
         <Card className="hover:shadow-md transition-shadow duration-200">
@@ -390,17 +226,9 @@ export function DashboardPage() {
                 <span className="text-sm text-muted-foreground">Conversion Rate</span>
                 <span className="text-sm text-emerald-600">{dashboardStats.conversionRate}%</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-border">
+              <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-muted-foreground">Active Campaigns</span>
                 <span className="text-sm">{dashboardStats.activeCampaigns}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Appointments Today</span>
-                <span className="text-sm text-[#1a8ee9]">4</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-muted-foreground">Hot Leads</span>
-                <span className="text-sm text-red-500">18</span>
               </div>
             </div>
           </CardContent>

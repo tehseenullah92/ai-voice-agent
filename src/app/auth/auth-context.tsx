@@ -26,6 +26,7 @@ type AuthContextValue = {
     company?: string;
   }) => Promise<void>;
   logout: () => void;
+  updateProfile: (args: { email?: string; name?: string }) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -179,6 +180,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     void clearServerSession().catch(() => {});
   }, []);
 
+  const updateProfile = useCallback(
+    ({ email: newEmail, name: newName }: { email?: string; name?: string }) => {
+      setUser((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          ...(newEmail != null && { email: newEmail }),
+          ...(newName != null && { name: newName }),
+        };
+        setStoredCurrentUser(updated);
+        const users = getStoredUsers();
+        const idx = users.findIndex(
+          (u) => u.email.toLowerCase() === prev.email.toLowerCase()
+        );
+        if (idx >= 0) {
+          const u = users[idx];
+          users[idx] = {
+            ...u,
+            ...(newEmail != null && { email: newEmail }),
+            ...(newName != null && { name: newName }),
+          };
+          setStoredUsers(users);
+        }
+        return updated;
+      });
+    },
+    []
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -186,8 +216,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       login,
       signup,
       logout,
+      updateProfile,
     }),
-    [user, loading, login, signup, logout]
+    [user, loading, login, signup, logout, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

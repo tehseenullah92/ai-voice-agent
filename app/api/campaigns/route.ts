@@ -4,6 +4,7 @@ import {
   getOrCreateAuthenticatedUser,
   unauthorizedJsonResponse,
 } from "../../../lib/server-auth";
+import { autoPopulateCalls } from "../../../lib/campaign-populate";
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,6 +66,16 @@ export async function POST(req: NextRequest) {
         callEnd: callHoursEnd,
       },
     });
+
+    if (clientList) {
+      await autoPopulateCalls(prisma, created.id, user.id);
+      const refreshed = await prisma.campaign.findUnique({
+        where: { id: created.id },
+      });
+      if (refreshed) {
+        return NextResponse.json({ campaign: refreshed }, { status: 201 });
+      }
+    }
 
     return NextResponse.json({ campaign: created }, { status: 201 });
   } catch (err) {

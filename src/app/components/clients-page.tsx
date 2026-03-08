@@ -84,6 +84,9 @@ export function ClientsPage() {
   const [editClient, setEditClient] = useState({
     name: "", phone: "", location: "", tags: "", status: "active", source: "Manual",
   });
+  const [adding, setAdding] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -171,6 +174,7 @@ export function ClientsPage() {
     };
     const doCreate = async () => {
       if (!user?.email) return;
+      setAdding(true);
       try {
         const res = await fetch("/api/clients", {
           method: "POST",
@@ -224,6 +228,8 @@ export function ClientsPage() {
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to create client");
+      } finally {
+        setAdding(false);
       }
     };
 
@@ -236,6 +242,7 @@ export function ClientsPage() {
       return;
     }
     const doUpdate = async () => {
+      setUpdating(true);
       try {
         const res = await fetch(`/api/clients/${selectedClient.id}`, {
           method: "PUT",
@@ -285,6 +292,8 @@ export function ClientsPage() {
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to update client");
+      } finally {
+        setUpdating(false);
       }
     };
 
@@ -311,6 +320,7 @@ export function ClientsPage() {
 
   const handleDelete = (client: ClientType) => {
     const doDelete = async () => {
+      setDeleting(true);
       try {
         const res = await fetch(`/api/clients/${client.id}`, {
           method: "DELETE",
@@ -320,10 +330,13 @@ export function ClientsPage() {
           throw new Error(data.error || "Failed to delete client");
         }
         setClientsList((prev) => prev.filter((c) => c.id !== client.id));
+        setDeleteClient(null);
         toast.success(`Client "${client.name}" deleted`);
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to delete client");
+      } finally {
+        setDeleting(false);
       }
     };
 
@@ -831,8 +844,11 @@ export function ClientsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditClient}>Update Client</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={updating}>Cancel</Button>
+            <Button onClick={handleEditClient} disabled={updating} className="gap-2">
+              {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Update Client
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -851,18 +867,20 @@ export function ClientsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel
               onClick={() => setDeleteClient(null)}
+              disabled={deleting}
             >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
               onClick={() => {
                 if (deleteClient) {
                   handleDelete(deleteClient);
                 }
-                setDeleteClient(null);
               }}
             >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -955,9 +973,9 @@ export function ClientsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddClient}>
-              <Plus className="w-4 h-4" />
+            <Button variant="outline" onClick={() => setAddOpen(false)} disabled={adding}>Cancel</Button>
+            <Button onClick={handleAddClient} disabled={adding} className="gap-2">
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Add Client
             </Button>
           </DialogFooter>

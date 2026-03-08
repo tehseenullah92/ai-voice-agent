@@ -20,12 +20,14 @@ model User {
   updatedAt DateTime  @updatedAt
 
   // Relations
-  clients      Client[]
-  clientLists  ClientList[]
-  campaigns    Campaign[]
-  leads        Lead[]
+  clients        Client[]
+  clientLists    ClientList[]
+  campaigns      Campaign[]
+  leads          Lead[]
   companySetting CompanySetting?
   teamMembers    TeamMember[]
+  twilioAccount  TwilioAccount?
+  phoneNumbers   PhoneNumber[]
 }
 
 enum ClientStatus {
@@ -121,10 +123,40 @@ model Campaign {
 
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   listLinks   CampaignClientList[]
+  calls       Call[]
 
   leads       Lead[]
 
   @@index([userId])
+}
+
+enum CallStatus {
+  pending
+  in_progress
+  completed
+  failed
+  no_answer
+}
+
+model Call {
+  id           String     @id @default(cuid())
+  campaignId   String
+  clientId     String?
+  clientName   String?
+  clientPhone  String
+  status       CallStatus  @default(pending)
+  duration     Int?       // seconds
+  outcome      String?    // interested, not_interested, callback, etc.
+  notes        String?
+  recordingUrl String?   // URL to call recording
+  transcript   String?   @db.Text // full conversation transcript
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  campaign    Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([status])
 }
 
 model CampaignClientList {
@@ -205,5 +237,38 @@ model TeamMember {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+model TwilioAccount {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  accountSid  String
+  authToken   String
+  accountName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumbers PhoneNumber[]
+
+  @@index([userId])
+}
+
+model PhoneNumber {
+  id             String   @id @default(cuid())
+  userId         String
+  twilioAccountId String
+  phoneNumber    String
+  phoneNumberSid String
+  friendlyName   String?
+  label          String?
+  capabilities   String?  @db.Text // JSON: voice, sms, mms
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  twilioAccount TwilioAccount @relation(fields: [twilioAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phoneNumberSid])
   @@index([userId])
 }

@@ -7,11 +7,8 @@ import { DashboardPage } from "./components/dashboard-page";
 import { ClientsPage } from "./components/clients-page";
 import { ClientListsPage } from "./components/client-lists-page";
 import { CampaignsPage } from "./components/campaigns-page";
-import { LeadsPage } from "./components/leads-page";
-import { CallLogsPage } from "./components/call-logs-page";
-import { AppointmentsPage } from "./components/appointments-page";
+import { CampaignDetailPage } from "./components/campaign-detail-page";
 import { SettingsPage } from "./components/settings-page";
-import { PhoneNumbersPage } from "./components/phone-numbers-page";
 import { LandingPage } from "./components/landing-page";
 import { BrandPage } from "./components/brand-page";
 import { SignInPage } from "./components/signin-page";
@@ -65,10 +62,7 @@ export default function App() {
             <Route path="clients" element={<ClientsPage />} />
             <Route path="client-lists" element={<ClientListsPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
-            <Route path="leads" element={<LeadsPage />} />
-            <Route path="call-logs" element={<CallLogsPage />} />
-            <Route path="phone-numbers" element={<PhoneNumbersPage />} />
-            <Route path="appointments" element={<AppointmentsPage />} />
+            <Route path="campaigns/:id" element={<CampaignDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpSupportPage />} />
           </Route>

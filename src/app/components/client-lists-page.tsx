@@ -67,6 +67,9 @@ export function ClientListsPage() {
   const [memberSearch, setMemberSearch] = useState("");
   const [addClientSearch, setAddClientSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ClientList | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const getMembers = (listId: string) => {
     const ids = membership[listId] || [];
@@ -140,6 +143,7 @@ export function ClientListsPage() {
     }
     const create = async () => {
       if (!user?.email) return;
+      setCreating(true);
       try {
         const res = await fetch("/api/client-lists", {
           method: "POST",
@@ -176,6 +180,8 @@ export function ClientListsPage() {
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to create list");
+      } finally {
+        setCreating(false);
       }
     };
 
@@ -186,6 +192,7 @@ export function ClientListsPage() {
     if (!editingList || !form.name) return;
 
     const update = async () => {
+      setEditing(true);
       try {
         const res = await fetch(`/api/client-lists/${editingList.id}`, {
           method: "PUT",
@@ -212,6 +219,8 @@ export function ClientListsPage() {
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to update list");
+      } finally {
+        setEditing(false);
       }
     };
 
@@ -228,6 +237,7 @@ export function ClientListsPage() {
 
   const handleDelete = (id: string, name: string) => {
     const remove = async () => {
+      setDeleting(true);
       try {
         const res = await fetch(`/api/client-lists/${id}`, {
           method: "DELETE",
@@ -242,10 +252,13 @@ export function ClientListsPage() {
           delete next[id];
           return next;
         });
+        setDeleteTarget(null);
         toast.success(`List "${name}" deleted`);
       } catch (err: any) {
         console.error(err);
         toast.error(err.message || "Failed to delete list");
+      } finally {
+        setDeleting(false);
       }
     };
 
@@ -415,9 +428,9 @@ export function ClientListsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate}>
-              <Plus className="w-4 h-4" />
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={creating} className="gap-2">
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Create List
             </Button>
           </DialogFooter>
@@ -611,7 +624,8 @@ export function ClientListsPage() {
                     <p className="text-xs text-muted-foreground">Campaigns</p>
                   </div>
                 </div>
-                <Button onClick={handleEdit} className="w-full">
+                <Button onClick={handleEdit} disabled={editing} className="w-full gap-2">
+                  {editing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Save Changes
                 </Button>
               </TabsContent>
@@ -619,7 +633,7 @@ export function ClientListsPage() {
           )}
 
           <DialogFooter className="mt-2">
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editing}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -639,18 +653,19 @@ export function ClientListsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)} disabled={deleting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
               onClick={() => {
                 if (deleteTarget) {
                   handleDelete(deleteTarget.id, deleteTarget.name);
                 }
-                setDeleteTarget(null);
               }}
             >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

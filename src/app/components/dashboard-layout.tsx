@@ -15,10 +15,8 @@ import { Toaster, toast } from "sonner";
 import { useAuth } from "../auth";
 
 const mockNotifications = [
-  { id: "1", title: "New Hot Lead", description: "Ahmed Khan showed interest in DHA Phase 5", time: "2 min ago", read: false, icon: Target, color: "text-red-500" },
   { id: "2", title: "Campaign Completed", description: "Giga Mall Investor Outreach finished all calls", time: "15 min ago", read: false, icon: Megaphone, color: "text-[#1a8ee9]" },
-  { id: "3", title: "Appointment Booked", description: "Site visit scheduled with Usman Tariq", time: "1 hr ago", read: false, icon: CalendarCheck, color: "text-[#1a8ee9]" },
-  { id: "4", title: "New Lead Generated", description: "Sara Ali from Giga Mall campaign", time: "2 hrs ago", read: true, icon: Target, color: "text-orange-500" },
+  { id: "4", title: "New Result Generated", description: "Sara Ali result from Giga Mall campaign", time: "2 hrs ago", read: true, icon: Target, color: "text-orange-500" },
   { id: "5", title: "Campaign Paused", description: "Blue World City Revival was auto-paused", time: "3 hrs ago", read: true, icon: Megaphone, color: "text-amber-500" },
 ];
 
@@ -63,9 +61,8 @@ export function DashboardLayout() {
         <SidebarNav />
       </div>
       <div
-        className={`fixed inset-y-0 left-0 z-50 lg:hidden transition-transform duration-300 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 lg:hidden transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <SidebarNav />
       </div>
@@ -129,9 +126,8 @@ export function DashboardLayout() {
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        className={`flex items-start gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer ${
-                          !n.read ? "bg-[#1a8ee9]/5" : ""
-                        }`}
+                        className={`flex items-start gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer ${!n.read ? "bg-[#1a8ee9]/5" : ""
+                          }`}
                         onClick={() => markAsRead(n.id)}
                       >
                         <div className={`mt-0.5 ${n.color}`}>
