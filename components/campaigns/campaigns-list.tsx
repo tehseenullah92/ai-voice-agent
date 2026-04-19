@@ -17,12 +17,13 @@ import {
   Trash2,
   UserSearch,
   Eye,
+  Play,
   type LucideIcon,
 } from "lucide-react";
 
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
@@ -142,7 +143,7 @@ function CampaignsTableSkeleton() {
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Contacts</TableHead>
             <TableHead>Created</TableHead>
-            <TableHead className="w-[100px] text-right">Actions</TableHead>
+            <TableHead className="min-w-[11rem] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -180,6 +181,7 @@ export function CampaignsList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [starting, setStarting] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [restartDialog, setRestartDialog] = useState<{
     id: string;
@@ -198,6 +200,35 @@ export function CampaignsList() {
         r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q)
     );
   }, [rows, search]);
+
+  async function executeStart(campaignId: string) {
+    setStarting(campaignId);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/launch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        totalContacts?: number;
+        callsInitiated?: number;
+      };
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not start campaign");
+        return;
+      }
+      toast.success("Campaign started.");
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === campaignId ? { ...r, status: "Active" } : r
+        )
+      );
+    } catch {
+      toast.error("Could not reach the server.");
+    } finally {
+      setStarting(null);
+    }
+  }
 
   async function executeRestart() {
     if (!restartDialog) return;
@@ -361,7 +392,7 @@ export function CampaignsList() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Contacts</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
+                <TableHead className="min-w-[11rem] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -394,6 +425,19 @@ export function CampaignsList() {
                       {row.created}
                     </TableCell>
                     <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {row.status === "Draft" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 gap-1"
+                            disabled={starting === row.id}
+                            onClick={() => void executeStart(row.id)}
+                          >
+                            <Play className="size-3.5" aria-hidden />
+                            Start
+                          </Button>
+                        ) : null}
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           className={buttonVariants({
@@ -460,6 +504,7 @@ export function CampaignsList() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

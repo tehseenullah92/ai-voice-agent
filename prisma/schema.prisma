@@ -83,8 +83,6 @@ model Campaign {
   callHoursTo       String?
   timezone          String?
   callsPerHour      Int       @default(60)
-  /// When true, campaign status becomes `completed` after every contact is finished (completed/failed).
-  stopWhenAllReached Boolean  @default(true)
   /// Optional E.164 override; when null, workspace.twilioNumber is used for outbound
   fromPhoneNumber   String?
   elevenLabsAgentId String?

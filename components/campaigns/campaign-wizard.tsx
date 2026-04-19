@@ -41,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   campaignWizardReducer,
@@ -238,99 +237,71 @@ export function CampaignWizard() {
     [parseFile]
   );
 
-  const finish = useCallback(
-    async (mode: "draft" | "launch") => {
-      const phoneColumn = state.contacts.phoneColumn;
-      if (!phoneColumn) {
-        toast.error("Select a phone column before saving.");
+  const finish = useCallback(async () => {
+    const phoneColumn = state.contacts.phoneColumn;
+    if (!phoneColumn) {
+      toast.error("Select a phone column before saving.");
+      return;
+    }
+
+    const contacts = state.contacts.rows.map((row) => {
+      const phone = String(row[phoneColumn] ?? "").trim();
+      const data = Object.fromEntries(
+        state.contacts.headers
+          .filter((h) => h !== phoneColumn)
+          .map((h) => [h, row[h] ?? ""])
+      );
+      return { phone, data };
+    });
+
+    const payload = {
+      name: state.basics.name.trim(),
+      type: state.basics.type,
+      description: state.basics.description.trim() || null,
+      status: "draft",
+      agentName: state.agent.name.trim(),
+      agentVoice: voiceLabelFromId(state.agent.voiceId),
+      openingLine: state.agent.openingLine.trim(),
+      instructions: state.agent.goal.trim(),
+      maxDuration: state.agent.maxDurationMinutes,
+      startAt: new Date(state.schedule.startLocal).toISOString(),
+      callHoursFrom: state.schedule.callingFrom,
+      callHoursTo: state.schedule.callingTo,
+      timezone: state.schedule.timezone,
+        callsPerHour: state.schedule.callsPerHour,
+        fromPhoneNumber: state.basics.fromPhoneNumber.trim() || null,
+      contacts,
+    };
+
+    try {
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const body = (await res.json()) as { error?: string; id?: string };
+
+      if (!res.ok) {
+        toast.error(body.error ?? "Failed to save campaign");
         return;
       }
 
-      const contacts = state.contacts.rows.map((row) => {
-        const phone = String(row[phoneColumn] ?? "").trim();
-        const data = Object.fromEntries(
-          state.contacts.headers
-            .filter((h) => h !== phoneColumn)
-            .map((h) => [h, row[h] ?? ""])
-        );
-        return { phone, data };
-      });
-
-      const payload = {
-        name: state.basics.name.trim(),
-        type: state.basics.type,
-        description: state.basics.description.trim() || null,
-        status: "draft",
-        agentName: state.agent.name.trim(),
-        agentVoice: voiceLabelFromId(state.agent.voiceId),
-        openingLine: state.agent.openingLine.trim(),
-        instructions: state.agent.goal.trim(),
-        maxDuration: state.agent.maxDurationMinutes,
-        startAt: new Date(state.schedule.startLocal).toISOString(),
-        callHoursFrom: state.schedule.callingFrom,
-        callHoursTo: state.schedule.callingTo,
-        timezone: state.schedule.timezone,
-        callsPerHour: state.schedule.callsPerHour,
-        stopWhenAllReached: state.schedule.stopWhenAllReached,
-        fromPhoneNumber: state.basics.fromPhoneNumber.trim() || null,
-        contacts,
-      };
-
-      try {
-        const res = await fetch("/api/campaigns", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const body = (await res.json()) as { error?: string; id?: string };
-
-        if (!res.ok) {
-          toast.error(body.error ?? "Failed to save campaign");
-          return;
-        }
-
-        const campaignId = body.id;
-        if (!campaignId) {
-          toast.error("Invalid response from server");
-          return;
-        }
-
-        if (mode === "launch") {
-          if (!telephony.twilioConfigured) {
-            toast.error(
-              "Connect Twilio in Settings before launching a campaign."
-            );
-            return;
-          }
-          const launchRes = await fetch(`/api/campaigns/${campaignId}/launch`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-          const launchBody = (await launchRes.json()) as { error?: string };
-          if (!launchRes.ok) {
-            toast.error(launchBody.error ?? "Failed to launch campaign");
-            return;
-          }
-          toast.success("Campaign launched.");
-        } else {
-          toast.success("Campaign saved as draft.");
-        }
-
-        router.push("/dashboard/campaigns");
-      } catch (e) {
-        console.error(e);
-        toast.error("Something went wrong.");
+      if (!body.id) {
+        toast.error("Invalid response from server");
+        return;
       }
-    },
-    [router, state, telephony.twilioConfigured]
-  );
+
+      toast.success("Campaign created. Start it from the campaign list when you are ready.");
+      router.push("/dashboard/campaigns");
+    } catch (e) {
+      console.error(e);
+      toast.error("Something went wrong.");
+    }
+  }, [router, state]);
 
   const previewRows = state.contacts.rows.slice(0, 5);
   const contactCount = state.contacts.rows.length;
-
-  const launchBlocked =
-    telephony.loaded && !telephony.twilioConfigured;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-16">
@@ -460,27 +431,9 @@ export function CampaignWizard() {
               <ArrowRight className="size-4" />
             </Button>
           ) : (
-            <>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void finish("draft")}
-              >
-                Save as Draft
-              </Button>
-              <Button
-                type="button"
-                disabled={launchBlocked}
-                title={
-                  launchBlocked
-                    ? "Connect Twilio in Settings to launch"
-                    : undefined
-                }
-                onClick={() => void finish("launch")}
-              >
-                Launch Campaign
-              </Button>
-            </>
+            <Button type="button" onClick={() => void finish()}>
+              Create campaign
+            </Button>
           )}
         </div>
       </div>
@@ -1185,27 +1138,6 @@ export function StepSchedule({
             }}
           />
         </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 px-4 py-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="stop-toggle" className="text-foreground">
-              Stop campaign when all contacts reached
-            </Label>
-            <p className="text-[12px] text-muted-foreground">
-              Prevents further dialing after the list is exhausted.
-            </p>
-          </div>
-          <Switch
-            id="stop-toggle"
-            checked={state.schedule.stopWhenAllReached}
-            onCheckedChange={(checked) =>
-              dispatch({
-                type: "SET_SCHEDULE",
-                payload: { stopWhenAllReached: checked },
-              })
-            }
-          />
-        </div>
       </CardContent>
     </Card>
   );
@@ -1269,9 +1201,10 @@ function StepReview({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Review &amp; launch</CardTitle>
+        <CardTitle>Review &amp; create</CardTitle>
         <CardDescription>
-          Confirm everything looks right before you save or go live.
+          Confirm everything looks right. The campaign is saved as a draft; start
+          dialing from the campaign list when you are ready.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1323,32 +1256,6 @@ function StepReview({
             ({tzLabel})
           </p>
           <p>Calls per hour: {state.schedule.callsPerHour}</p>
-          <div className="mt-3 space-y-2 rounded-lg border border-border bg-muted/20 px-4 py-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-medium text-foreground">
-                  Stop campaign when all contacts reached
-                </p>
-                <p className="text-[12px] text-muted-foreground">
-                  Prevents further dialing after the list is exhausted.
-                </p>
-              </div>
-              <span className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-sm font-medium tabular-nums text-foreground">
-                {state.schedule.stopWhenAllReached ? "Yes" : "No"}
-              </span>
-            </div>
-            <p className="text-[12px] text-muted-foreground">
-              This mirrors your Schedule setting — use{" "}
-              <button
-                type="button"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-                onClick={() => onEditSection(3)}
-              >
-                Edit
-              </button>{" "}
-              on Schedule to change it.
-            </p>
-          </div>
         </ReviewSection>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">

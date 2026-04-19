@@ -43,7 +43,6 @@ export async function POST(request: Request) {
     callHoursTo?: string | null;
     timezone?: string | null;
     callsPerHour?: number;
-    stopWhenAllReached?: boolean;
     /** E.164; omit or null to use workspace default */
     fromPhoneNumber?: string | null;
     contacts: ContactInput[];
@@ -106,7 +105,6 @@ export async function POST(request: Request) {
       callHoursTo: body.callHoursTo ?? null,
       timezone: body.timezone ?? null,
       callsPerHour: body.callsPerHour ?? 60,
-      stopWhenAllReached: body.stopWhenAllReached ?? true,
       fromPhoneNumber: fromOverride,
     },
   });

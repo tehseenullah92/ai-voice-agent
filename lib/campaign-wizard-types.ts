@@ -101,7 +101,6 @@ export type CampaignWizardState = {
     callingTo: string;
     timezone: string;
     callsPerHour: number;
-    stopWhenAllReached: boolean;
   };
 };
 
@@ -129,7 +128,6 @@ export const initialCampaignWizardState = (): CampaignWizardState => {
       callingTo: "18:00",
       timezone: "America/New_York",
       callsPerHour: 60,
-      stopWhenAllReached: true,
     },
   };
 };

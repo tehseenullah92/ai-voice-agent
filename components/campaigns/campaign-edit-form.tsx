@@ -39,7 +39,6 @@ type ApiCampaignPayload = {
   callHoursTo: string | null;
   timezone: string | null;
   callsPerHour: number;
-  stopWhenAllReached: boolean;
   fromPhoneNumber: string | null;
 };
 
@@ -67,7 +66,6 @@ function campaignToState(c: ApiCampaignPayload): CampaignWizardState {
       callingTo: c.callHoursTo ?? empty.schedule.callingTo,
       timezone: c.timezone ?? empty.schedule.timezone,
       callsPerHour: c.callsPerHour ?? 60,
-      stopWhenAllReached: c.stopWhenAllReached ?? true,
     },
   };
 }
@@ -172,7 +170,6 @@ export function CampaignEditForm({ campaignId }: { campaignId: string }) {
       callHoursTo: state.schedule.callingTo,
       timezone: state.schedule.timezone,
       callsPerHour: state.schedule.callsPerHour,
-      stopWhenAllReached: state.schedule.stopWhenAllReached,
       fromPhoneNumber: state.basics.fromPhoneNumber.trim() || null,
     };
     try {

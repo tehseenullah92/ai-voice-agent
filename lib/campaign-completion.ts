@@ -7,11 +7,10 @@ import { prisma } from "@/lib/prisma";
 export async function maybeMarkCampaignCompleted(campaignId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    select: { status: true, stopWhenAllReached: true },
+    select: { status: true },
   });
 
   if (!campaign || campaign.status !== "active") return;
-  if (!campaign.stopWhenAllReached) return;
 
   const pending = await prisma.contact.count({
     where: { campaignId, status: "pending" },

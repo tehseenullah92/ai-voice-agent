@@ -112,7 +112,6 @@ export async function PATCH(request: Request, { params }: Params) {
     callHoursTo,
     timezone,
     callsPerHour,
-    stopWhenAllReached,
     fromPhoneNumber,
   } = body;
 
@@ -175,9 +174,6 @@ export async function PATCH(request: Request, { params }: Params) {
         : {}),
       ...(callsPerHour !== undefined && typeof callsPerHour === "number"
         ? { callsPerHour }
-        : {}),
-      ...(stopWhenAllReached !== undefined && typeof stopWhenAllReached === "boolean"
-        ? { stopWhenAllReached }
         : {}),
       ...(fromPhoneNumber !== undefined
         ? {
