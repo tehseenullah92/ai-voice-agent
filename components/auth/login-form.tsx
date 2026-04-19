@@ -60,7 +60,7 @@ export function LoginForm() {
           autoComplete="email"
           required
           placeholder="you@company.com"
-          className="h-9 bg-background"
+          className="h-10 bg-background"
         />
       </div>
       <div className="space-y-2">
@@ -80,12 +80,12 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           placeholder="••••••••"
-          className="h-9 bg-background"
+          className="h-10 bg-background"
         />
       </div>
       <Button
         type="submit"
-        className="mt-2 w-full h-9 font-medium"
+        className="mt-2 h-10 w-full font-medium"
         disabled={loading}
       >
         {loading ? "Signing in…" : "Sign in"}

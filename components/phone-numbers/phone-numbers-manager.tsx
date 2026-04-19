@@ -124,7 +124,7 @@ export function PhoneNumbersManager() {
         <h2 className="text-sm font-medium text-muted-foreground">
           Phone numbers
         </h2>
-        <p className="max-w-xl min-h-[2.75rem] text-[13px] leading-relaxed text-muted-foreground">
+        <p className="min-h-[2.75rem] text-[13px] leading-relaxed text-muted-foreground">
           {description}
         </p>
       </div>
@@ -137,7 +137,7 @@ export function PhoneNumbersManager() {
           />
         </div>
       ) : !twilioConfigured ? (
-        <Card className="max-w-lg border-border bg-card">
+        <Card className="w-full border-border bg-card">
           <CardHeader>
             <CardTitle className="text-[15px]">Twilio</CardTitle>
             <CardDescription>
@@ -192,7 +192,7 @@ export function PhoneNumbersManager() {
               </Button>
             </ListEmptyState>
           ) : (
-            <Card className="max-w-lg border-border bg-card">
+            <Card className="w-full border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-[15px]">Default caller ID</CardTitle>
                 <CardDescription>
@@ -207,7 +207,7 @@ export function PhoneNumbersManager() {
                     value={selected || defaultFrom || ""}
                     onValueChange={(v) => void onDefaultChange(v)}
                   >
-                    <SelectTrigger id="default-from" className="max-w-md">
+                    <SelectTrigger id="default-from" className="w-full">
                       <SelectValue placeholder="Select a number" />
                     </SelectTrigger>
                     <SelectContent>

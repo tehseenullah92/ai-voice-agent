@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CreditCard, Loader2, Sparkles } from "lucide-react";
+import { Check, Coins, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { hasEntitlingSubscription } from "@/lib/billing/plans";
@@ -124,7 +124,7 @@ export function BillingClient({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="size-4" />
+            <Coins className="size-4" />
             Credit Balance
           </CardTitle>
           <CardDescription>

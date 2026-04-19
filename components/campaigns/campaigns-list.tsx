@@ -134,8 +134,25 @@ function StatusBadge({ status }: { status: RowStatus }) {
 
 function CampaignsTableSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-card/40 ring-1 ring-foreground/5">
-      <Table>
+    <>
+      {/* Mobile skeleton */}
+      <div className="space-y-2.5 md:hidden">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          >
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="mt-2 h-3 w-1/3" />
+            <div className="mt-4 flex items-center justify-between">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-hidden rounded-xl border border-border bg-card/40 ring-1 ring-foreground/5 md:block">
+        <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead>Name</TableHead>
@@ -171,7 +188,8 @@ function CampaignsTableSkeleton() {
           ))}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -336,7 +354,7 @@ export function CampaignsList() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h2 className="text-sm font-medium text-muted-foreground">
+          <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
             Campaigns
           </h2>
           <p className="max-w-lg text-[13px] leading-relaxed text-muted-foreground">
@@ -345,7 +363,11 @@ export function CampaignsList() {
         </div>
         <Link
           href="/dashboard/campaigns/new"
-          className={buttonVariants({ variant: "default" })}
+          className={buttonVariants({
+            variant: "default",
+            size: "lg",
+            className: "self-start sm:self-auto",
+          })}
         >
           New Campaign
         </Link>
@@ -383,7 +405,139 @@ export function CampaignsList() {
           </Link>
         </ListEmptyState>
       ) : (
-        <div className="rounded-xl border border-border bg-card/40 ring-1 ring-foreground/5">
+        <>
+          {/* Mobile: card list */}
+          <div className="space-y-2.5 md:hidden">
+            {filteredRows.length === 0 ? (
+              <div className="rounded-xl border border-border bg-card/40 px-4 py-12 text-center text-[13px] text-muted-foreground">
+                No campaigns match &ldquo;{search.trim()}&rdquo;.
+              </div>
+            ) : (
+              filteredRows.map((row) => {
+                const { Icon, iconClass } = typePresentation(row.type);
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <Link
+                        href={`/dashboard/campaigns/${row.id}`}
+                        className="min-w-0 flex-1"
+                      >
+                        <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                          {row.name}
+                        </p>
+                        <div className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                          <Icon
+                            className={cn("size-3.5", iconClass)}
+                            strokeWidth={1.75}
+                            aria-hidden
+                          />
+                          <span className="truncate">{row.type}</span>
+                        </div>
+                      </Link>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={buttonVariants({
+                            variant: "ghost",
+                            size: "icon-sm",
+                            className: "shrink-0 text-muted-foreground",
+                          })}
+                          aria-label="Open actions"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-44">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(`/dashboard/campaigns/${row.id}`)
+                            }
+                          >
+                            <Eye className="size-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/campaigns/${row.id}/edit`
+                              )
+                            }
+                          >
+                            <Pencil className="size-4" />
+                            Edit details
+                          </DropdownMenuItem>
+                          {(row.status === "Completed" ||
+                            row.status === "Paused" ||
+                            row.status === "Active") && (
+                            <DropdownMenuItem
+                              disabled={restarting === row.id}
+                              onClick={() =>
+                                setRestartDialog({ id: row.id, mode: "all" })
+                              }
+                            >
+                              <RefreshCw className="size-4" />
+                              Restart (all contacts)
+                            </DropdownMenuItem>
+                          )}
+                          {(row.status === "Completed" ||
+                            row.status === "Paused" ||
+                            row.status === "Active") && (
+                            <DropdownMenuItem
+                              disabled={restarting === row.id}
+                              onClick={() =>
+                                setRestartDialog({
+                                  id: row.id,
+                                  mode: "failed",
+                                })
+                              }
+                            >
+                              <RefreshCw className="size-4" />
+                              Retry failed only
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={deleting === row.id}
+                            onClick={() =>
+                              setDeleteDialog({ id: row.id, name: row.name })
+                            }
+                          >
+                            <Trash2 className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-muted-foreground">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={row.status} />
+                        <span className="tabular-nums">
+                          {row.contacts.toLocaleString()} contacts
+                        </span>
+                      </div>
+                      <span>{row.created}</span>
+                    </div>
+                    {row.status === "Draft" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-3 h-8 w-full justify-center gap-1"
+                        disabled={starting === row.id}
+                        onClick={() => void executeStart(row.id)}
+                      >
+                        <Play className="size-3.5" aria-hidden />
+                        Start campaign
+                      </Button>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden overflow-hidden rounded-xl border border-border bg-card/40 ring-1 ring-foreground/5 md:block">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -511,7 +665,8 @@ export function CampaignsList() {
               )}
             </TableBody>
           </Table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
