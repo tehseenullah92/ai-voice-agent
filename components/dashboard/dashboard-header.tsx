@@ -22,7 +22,7 @@ export function DashboardHeader() {
   const { title, crumbs } = getDashboardPageMeta(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border px-6">
       <div className="min-w-0">
         <h1 className="text-[15px] font-semibold tracking-tight text-foreground">
           {title}

@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getSafeRedirectPath } from "@/lib/auth-redirect";
 import { measurePasswordStrength } from "@/lib/password-strength";
 import { cn } from "@/lib/utils";
 
 export function SignupForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
@@ -43,7 +41,7 @@ export function SignupForm() {
         setError(data.error ?? "Could not create account.");
         return;
       }
-      router.replace(getSafeRedirectPath(searchParams.get("next")));
+      router.replace("/dashboard/billing?afterSignup=1");
       router.refresh();
     } catch {
       setError("Network error. Try again.");

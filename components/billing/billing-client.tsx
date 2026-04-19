@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Check, CreditCard, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { hasEntitlingSubscription } from "@/lib/billing/plans";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,11 +34,12 @@ type Transaction = {
 
 type Props = {
   credits: number;
-  activePlan: string | null;
   subscriptionStatus: string | null;
   currentPeriodEnd: string | null;
   plans: PlanInfo[];
   transactions: Transaction[];
+  /** True right after account creation — show a one-time subscribe prompt. */
+  subscribePrompt?: boolean;
 };
 
 function typeLabel(type: string): string {
@@ -56,11 +59,11 @@ function typeLabel(type: string): string {
 
 export function BillingClient({
   credits,
-  activePlan,
   subscriptionStatus,
   currentPeriodEnd,
   plans,
   transactions,
+  subscribePrompt = false,
 }: Props) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -103,10 +106,20 @@ export function BillingClient({
     }
   }
 
-  const hasActiveSubscription = subscriptionStatus === "active";
+  const hasActiveSubscription = hasEntitlingSubscription(subscriptionStatus);
 
   return (
     <>
+      {subscribePrompt && !hasActiveSubscription ? (
+        <div className="rounded-lg border border-primary/25 bg-primary/5 px-4 py-3 text-[13px] leading-relaxed text-foreground">
+          <p className="font-medium">Welcome to Convaire</p>
+          <p className="mt-1 text-muted-foreground">
+            Pick a plan below to get monthly credits and unlock full calling
+            features. You can explore with your signup bonus until you subscribe.
+          </p>
+        </div>
+      ) : null}
+
       {/* Credit Balance */}
       <Card>
         <CardHeader>

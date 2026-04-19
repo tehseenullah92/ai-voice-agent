@@ -38,3 +38,10 @@ export function planKeyFromPriceId(priceId: string): PlanKey | null {
   }
   return null;
 }
+
+/** Stripe subscription statuses that grant plan entitlements (paid or trial). */
+export function hasEntitlingSubscription(
+  status: string | null | undefined
+): boolean {
+  return status === "active" || status === "trialing";
+}

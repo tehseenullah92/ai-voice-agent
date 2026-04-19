@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getSession } from "@/lib/auth/session";
+import { hasEntitlingSubscription } from "@/lib/billing/plans";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({
@@ -16,15 +17,27 @@ export default async function DashboardLayout({
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { email: true, credits: true },
+    select: {
+      email: true,
+      credits: true,
+      subscription: { select: { status: true } },
+    },
   });
 
   if (!user) {
     redirect("/api/auth/clear-session");
   }
 
+  const showUpgradeBanner = !hasEntitlingSubscription(
+    user.subscription?.status
+  );
+
   return (
-    <DashboardShell userEmail={user.email} credits={user.credits}>
+    <DashboardShell
+      userEmail={user.email}
+      credits={user.credits}
+      showUpgradeBanner={showUpgradeBanner}
+    >
       {children}
     </DashboardShell>
   );

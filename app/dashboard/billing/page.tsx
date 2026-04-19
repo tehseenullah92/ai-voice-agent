@@ -1,11 +1,19 @@
 import { redirect } from "next/navigation";
 
 import { BillingClient } from "@/components/billing/billing-client";
-import { PLANS, type PlanKey } from "@/lib/billing/plans";
+import {
+  hasEntitlingSubscription,
+  PLANS,
+  type PlanKey,
+} from "@/lib/billing/plans";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: { afterSignup?: string };
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -39,7 +47,10 @@ export default async function BillingPage() {
   });
 
   const sub = user.subscription;
-  const activePlan = sub?.status === "active" ? (sub.plan as PlanKey) : null;
+  const activePlan =
+    sub && hasEntitlingSubscription(sub.status)
+      ? (sub.plan as PlanKey)
+      : null;
 
   const plans = (Object.entries(PLANS) as [PlanKey, (typeof PLANS)[PlanKey]][]).map(
     ([key, plan]) => ({
@@ -51,14 +62,16 @@ export default async function BillingPage() {
     })
   );
 
+  const afterSignup = searchParams.afterSignup === "1";
+
   return (
     <div className="mx-auto max-w-3xl space-y-10 pb-16">
       <BillingClient
         credits={user.credits}
-        activePlan={activePlan}
         subscriptionStatus={sub?.status ?? null}
         currentPeriodEnd={sub?.currentPeriodEnd?.toISOString() ?? null}
         plans={plans}
+        subscribePrompt={afterSignup}
         transactions={transactions.map((t) => ({
           ...t,
           createdAt: t.createdAt.toISOString(),
