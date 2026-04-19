@@ -1,0 +1,123 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  password           String
+  credits            Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  workspace          Workspace?
+  subscription       Subscription?
+  creditTransactions CreditTransaction[]
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 String    @default("starter")
+  status               String    @default("active")
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Positive for additions, negative for deductions.
+  amount      Int
+  /// e.g. "signup_bonus", "subscription_renewal", "call_usage"
+  type        String
+  description String?
+  callId      String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Workspace {
+  id                     String     @id @default(cuid())
+  userId                 String     @unique
+  user                   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Optional display name for the workspace (shown in settings).
+  name                   String?    @db.VarChar(191)
+  /// Default IANA timezone label for scheduling (e.g. America/New_York).
+  defaultTimezone        String?    @db.VarChar(64)
+  twilioSid              String?
+  twilioToken            String?
+  /// E.164 selected as default outbound caller ID (must be in twilioIncomingNumbers when set)
+  twilioNumber           String?
+  /// Cached IncomingPhoneNumber list from Twilio (sid, phoneNumber, friendlyName)
+  twilioIncomingNumbers  Json?
+  campaigns              Campaign[]
+  createdAt              DateTime   @default(now())
+}
+
+model Campaign {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name              String
+  type              String
+  description       String?
+  status            String    @default("draft")
+  agentName         String?
+  agentVoice        String?
+  openingLine       String?
+  instructions      String?   @db.Text
+  maxDuration       Int       @default(5)
+  startAt           DateTime?
+  callHoursFrom     String?
+  callHoursTo       String?
+  timezone          String?
+  callsPerHour      Int       @default(60)
+  /// When true, campaign status becomes `completed` after every contact is finished (completed/failed).
+  stopWhenAllReached Boolean  @default(true)
+  /// Optional E.164 override; when null, workspace.twilioNumber is used for outbound
+  fromPhoneNumber   String?
+  elevenLabsAgentId String?
+  contacts          Contact[]
+  calls             Call[]
+  createdAt         DateTime  @default(now())
+}
+
+model Contact {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  phone      String
+  data       Json?
+  status     String   @default("pending")
+  calls      Call[]
+  createdAt  DateTime @default(now())
+}
+
+model Call {
+  id               String    @id @default(cuid())
+  campaignId       String
+  campaign         Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId        String
+  contact          Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  twilioSid        String?
+  elevenLabsConvId String?
+  status           String    @default("queued")
+  outcome          String?
+  duration         Int?
+  transcript       Json?
+  recordingUrl     String?
+  startedAt        DateTime?
+  endedAt          DateTime?
+  createdAt        DateTime  @default(now())
+}

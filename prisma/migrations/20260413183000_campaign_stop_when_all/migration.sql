@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Campaign` ADD COLUMN `stopWhenAllReached` BOOLEAN NOT NULL DEFAULT true;
