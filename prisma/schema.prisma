@@ -8,14 +8,29 @@ generator client {
 }
 
 model User {
-  id                 String               @id @default(cuid())
-  email              String               @unique
-  password           String
-  credits            Int                  @default(0)
-  createdAt          DateTime             @default(now())
-  workspace          Workspace?
-  subscription       Subscription?
-  creditTransactions CreditTransaction[]
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
+  password                 String
+  credits                  Int                       @default(0)
+  emailVerifiedAt          DateTime?
+  createdAt                DateTime                  @default(now())
+  workspace                Workspace?
+  subscription             Subscription?
+  creditTransactions       CreditTransaction[]
+  emailVerificationTokens  EmailVerificationToken[]
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hex digest of the random token sent to the user (raw token never stored).
+  tokenHash String   @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Subscription {

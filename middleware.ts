@@ -13,6 +13,10 @@ function isPublicApiPath(pathname: string): boolean {
   if (pathname === "/api/auth/clear-session") {
     return true;
   }
+  // Verifying an email link from an inbox should not require an active session.
+  if (pathname === "/api/auth/verify-email") {
+    return true;
+  }
   if (
     pathname.startsWith("/api/calls/twiml") ||
     pathname.startsWith("/api/calls/status")

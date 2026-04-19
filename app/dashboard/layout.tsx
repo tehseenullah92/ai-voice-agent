@@ -20,12 +20,17 @@ export default async function DashboardLayout({
     select: {
       email: true,
       credits: true,
+      emailVerifiedAt: true,
       subscription: { select: { status: true } },
     },
   });
 
   if (!user) {
     redirect("/api/auth/clear-session");
+  }
+
+  if (!user.emailVerifiedAt) {
+    redirect("/verify-email");
   }
 
   const showUpgradeBanner = !hasEntitlingSubscription(

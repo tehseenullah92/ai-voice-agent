@@ -41,7 +41,8 @@ export function SignupForm() {
         setError(data.error ?? "Could not create account.");
         return;
       }
-      router.replace("/dashboard/billing?afterSignup=1");
+      const next = encodeURIComponent("/dashboard/billing?afterSignup=1");
+      router.replace(`/verify-email?sent=1&next=${next}`);
       router.refresh();
     } catch {
       setError("Network error. Try again.");

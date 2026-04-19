@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SEC } from "@/lib/auth/constants";
+import { issueAndSendVerificationEmail } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
 import { createSessionToken } from "@/lib/auth/session";
 import { signupBodySchema } from "@/lib/auth/validation";
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     });
 
     await grantSignupBonus(user.id);
+    await issueAndSendVerificationEmail(user.id, user.email);
 
     const token = await createSessionToken(user.id);
     const res = NextResponse.json({ ok: true, userId: user.id });
